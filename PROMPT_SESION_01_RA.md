@@ -5,35 +5,20 @@ alcanza si la suite ya dio limpio y sólo queda commitear.
 
 ---
 
-## LO PRIMERO, ANTES DE CUALQUIER OTRA COSA
+## ESTADO: CERRADO. No queda trabajo pendiente.
 
-Leé el resultado de la suite con **todos** los portones encendidos, que quedó corriendo:
+Todo lo de abajo es **registro**, no agenda. Se terminó el 2026-08-21:
 
-```bash
-cat ~/ra_suite_allgates.log
-```
+- Suite con **todos** los portones (`NOT_CRAN=true`): **955 aserciones, 0 fallos, 0 errores,
+  2 saltadas** (rutas inalcanzables porque el backend SÍ está instalado).
+- `R CMD check --as-cran`: **0 errores, 0 avisos, 1 NOTE** («New submission»).
+- **Commit `a89065d`** en `main`, autor único José Mauricio. **NO se hizo `push`**: eso es
+  hacia afuera y queda a criterio suyo (`git push origin main`).
+- Aviso a QuantDialectics dejado en `~/QuantDialectics/AVISO_ROBUSTARITHMETIC_SALIDA_6_8_3.md`.
 
-Hay una segunda copia de la misma corrida, la primera que se lanzó, en
-`/tmp/claude-1000/-home-josemgomezj/b16ef71a-a695-446b-8046-1445f0e7656a/tasks/bwp1bd1du.output`;
-esa lleva un `timeout` de 50 minutos encima y puede haber muerto, por eso está la de `~`, que no
-tiene límite. **Cualquiera de las dos que diga `FALLOS: 0` sirve.**
-
-- **Si dice `FALLOS: 0` y `errores: 0`** → no queda nada que reparar, pasá a «El cierre» abajo.
-- **Si las dos están vacías o murieron** → relanzala:
-
-```bash
-cd ~/RobustArithmetic && Rscript -e 'Sys.setenv(NOT_CRAN="true");
-  suppressMessages(devtools::load_all(".", quiet=TRUE));
-  r <- testthat::test_dir("tests/testthat", reporter="silent", stop_on_failure=FALSE);
-  d <- as.data.frame(r)
-  cat("FALLOS:", sum(d$failed), " errores:", sum(d$error), " ok:", sum(d$passed), "\n")
-  bad <- d[d$failed > 0 | d$error, c("file","test")]; if (nrow(bad)) print(bad)'
-```
-
-Tarda **cerca de una hora**: los portones contra Rmpfr son barridos grandes y están
-`skip_on_cran` justamente por eso. Lanzala en segundo plano y no te quedes mirándola.
-
-- **Si algo falla** → repararlo antes de commitear. Nada se commitea con la suite en rojo.
+**Lo único que podría quedar por hacer, y es de QD y no de acá:** cerrar el §211 de
+`NOTES-FASE-B.md` de QuantDialectics con el resultado, y corregir ahí el criterio de contención,
+que tal como está escrito daría por buena una forma que no lo es. Está explicado en el aviso.
 
 ---
 
