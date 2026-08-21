@@ -1,0 +1,94 @@
+=== clausura bajo diferenciacion, simbolo por simbolo ===
+exp       clausura: exp                                                        | fuera de candidatos: -
+log       clausura: /                                                          | fuera de candidatos: -
+sin       clausura: - cos sin                                                  | fuera de candidatos: -
+cos       clausura: - cos sin                                                  | fuera de candidatos: -
+tan       clausura: - / ^ cos sin                                              | fuera de candidatos: -
+sinh      clausura: cosh sinh                                                  | fuera de candidatos: -
+cosh      clausura: cosh sinh                                                  | fuera de candidatos: -
+tanh      clausura: / ^ cosh sinh                                              | fuera de candidatos: -
+sqrt      clausura: * ^                                                        | fuera de candidatos: -
+expm1     clausura: exp                                                        | fuera de candidatos: -
+log1p     clausura: ( / +                                                      | fuera de candidatos: -
+log2      clausura: ( * / log                                                  | fuera de candidatos: -
+log10     clausura: ( * / log                                                  | fuera de candidatos: -
+asin      clausura: - ( * / ^ sqrt                                             | fuera de candidatos: -
+acos      clausura: - ( * / ^ sqrt                                             | fuera de candidatos: -
+atan      clausura: ( / ^ +                                                    | fuera de candidatos: -
+gamma     clausura: * digamma gamma psigamma trigamma                          | fuera de candidatos: -
+lgamma    clausura: digamma psigamma trigamma                                  | fuera de candidatos: -
+digamma   clausura: psigamma trigamma                                          | fuera de candidatos: -
+trigamma  clausura: psigamma                                                   | fuera de candidatos: -
+psigamma  clausura: psigamma                                                   | fuera de candidatos: -
+pnorm     clausura: - * dnorm                                                  | fuera de candidatos: -
+dnorm     clausura: - * dnorm                                                  | fuera de candidatos: -
+
+=== C1 y C2 conjuntas: quien entra a la v1 ===
+exp       C1=TRUE  C2=TRUE  C3=TRUE 
+log       C1=TRUE  C2=TRUE  C3=TRUE 
+sin       C1=TRUE  C2=TRUE  C3=TRUE 
+cos       C1=TRUE  C2=TRUE  C3=TRUE 
+tan       C1=TRUE  C2=TRUE  C3=TRUE 
+sinh      C1=TRUE  C2=TRUE  C3=TRUE 
+cosh      C1=TRUE  C2=TRUE  C3=TRUE 
+tanh      C1=TRUE  C2=TRUE  C3=TRUE 
+sqrt      C1=TRUE  C2=TRUE  C3=TRUE 
+expm1     C1=TRUE  C2=TRUE  C3=TRUE 
+log1p     C1=TRUE  C2=TRUE  C3=TRUE 
+log2      C1=TRUE  C2=TRUE  C3=TRUE 
+log10     C1=TRUE  C2=TRUE  C3=TRUE 
+asin      C1=TRUE  C2=TRUE  C3=TRUE 
+acos      C1=TRUE  C2=TRUE  C3=TRUE 
+atan      C1=TRUE  C2=TRUE  C3=TRUE 
+gamma     C1=TRUE  C2=TRUE  C3=FALSE
+lgamma    C1=TRUE  C2=TRUE  C3=FALSE
+digamma   C1=TRUE  C2=TRUE  C3=FALSE
+trigamma  C1=TRUE  C2=TRUE  C3=FALSE
+psigamma  C1=TRUE  C2=TRUE  C3=FALSE
+pnorm     C1=TRUE  C2=TRUE  C3=FALSE
+dnorm     C1=TRUE  C2=TRUE  C3=FALSE
+
+tabla v1 (C1 & C2 & C3): exp log sin cos tan sinh cosh tanh sqrt expm1 log1p log2 log10 asin acos atan 
+excluidas: gamma lgamma digamma trigamma psigamma pnorm dnorm 
+
+=== la clausura del CONJUNTO tabla_v1 es el propio conjunto? ===
+simbolos que aparecen en las derivadas: - ( * / ^ + cos cosh exp log sin sinh sqrt 
+fuera de la tabla v1 + operadores: NINGUNO -- la tabla es CERRADA 
+
+=== C4: el Rmpfr instalado provee la funcion ===
+exp       MPFR=TRUE
+log       MPFR=TRUE
+sin       MPFR=TRUE
+cos       MPFR=TRUE
+tan       MPFR=TRUE
+sinh      MPFR=TRUE
+cosh      MPFR=TRUE
+tanh      MPFR=TRUE
+sqrt      MPFR=TRUE
+expm1     MPFR=TRUE
+log1p     MPFR=TRUE
+log2      MPFR=TRUE
+log10     MPFR=TRUE
+asin      MPFR=TRUE
+acos      MPFR=TRUE
+atan      MPFR=TRUE
+
+=== holguras: slack(f) = ceiling(2*e(f) + 1) ===
+exp       e=0.511  slack=3 ulps
+log       e=0.52   slack=3 ulps
+sin       e=0.516  slack=3 ulps
+cos       e=0.516  slack=3 ulps
+tan       e=0.619  slack=3 ulps
+sinh      e=1.93   slack=5 ulps
+cosh      e=1.93   slack=5 ulps
+tanh      e=2.21   slack=6 ulps
+sqrt      e=0.5    slack=2 ulps
+expm1     e=0.913  slack=3 ulps
+log1p     e=0.899  slack=3 ulps
+log2      e=0.548  slack=3 ulps
+log10     e=1.62   slack=5 ulps
+asin      e=0.516  slack=3 ulps
+acos      e=0.523  slack=3 ulps
+atan      e=0.523  slack=3 ulps
+pow       e=0.523  slack=3 ulps
+CIERRE-TABLA-FIN

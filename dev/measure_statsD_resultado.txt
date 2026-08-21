@@ -1,0 +1,74 @@
+=== UNARIAS: D(f(x), "x") ===
+exp        SI  exp(x)
+log        SI  1/x
+sin        SI  cos(x)
+cos        SI  -sin(x)
+tan        SI  1/cos(x)^2
+sinh       SI  cosh(x)
+cosh       SI  sinh(x)
+tanh       SI  1/cosh(x)^2
+sqrt       SI  0.5 * x^-0.5
+abs        NO  La función 'abs' no está en la tabla de derivados
+sign       NO  La función 'sign' no está en la tabla de derivados
+asin       SI  1/sqrt(1 - x^2)
+acos       SI  -(1/sqrt(1 - x^2))
+atan       SI  1/(1 + x^2)
+asinh      NO  La función 'asinh' no está en la tabla de derivados
+acosh      NO  La función 'acosh' no está en la tabla de derivados
+atanh      NO  La función 'atanh' no está en la tabla de derivados
+expm1      SI  exp(x)
+log1p      SI  1/(1 + x)
+log2       SI  1/(x * log(2))
+log10      SI  1/(x * log(10))
+gamma      SI  gamma(x) * digamma(x)
+lgamma     SI  digamma(x)
+digamma    SI  trigamma(x)
+trigamma   SI  psigamma(x, 2L)
+psigamma   SI  psigamma(x, 1L)
+besselJ    NO  La función 'besselJ' no está en la tabla de derivados
+floor      NO  La función 'floor' no está en la tabla de derivados
+ceiling    NO  La función 'ceiling' no está en la tabla de derivados
+round      NO  La función 'round' no está en la tabla de derivados
+trunc      NO  La función 'trunc' no está en la tabla de derivados
+max        NO  La función 'max' no está en la tabla de derivados
+min        NO  La función 'min' no está en la tabla de derivados
+pnorm      SI  dnorm(x)
+dnorm      SI  -(x * dnorm(x))
+plogis     NO  La función 'plogis' no está en la tabla de derivados
+dlogis     NO  La función 'dlogis' no está en la tabla de derivados
+exp2       NO  La función 'exp2' no está en la tabla de derivados
+
+=== BINARIAS: D(x <op> y, "x") ===
++      SI  1
+-      SI  1
+*      SI  y
+/      SI  1/y
+^      SI  x^(y - 1) * y
+%%     NO  La función '`%%`' no está en la tabla de derivados
+%/%    NO  La función '`%/%`' no está en la tabla de derivados
+
+=== UNARIO: D(-x, "x") y D(+x, "x") ===
+-x   SI  -1
++x   SI  1
+
+=== POTENCIAS: exponente constante, variable y base variable ===
+x^2        SI  2 * x
+x^0.5      SI  0.5 * x^-0.5
+x^(-3)     SI  x^((-3) - 1) * (-3)
+x^y        SI  x^(y - 1) * y
+2^x        SI  2^x * log(2)
+exp(1)^x   SI  exp(1)^x * log(exp(1))
+
+=== log de dos argumentos (base) ===
+log(x, 2)        NO  only single-argument calls to log() are supported;
+  maybe use log(x,a) = log(x)/log(a)
+log(x, base = 2) NO  only single-argument calls to log() are supported;
+  maybe use log(x,a) = log(x)/log(a)
+
+=== resumen para la tabla cerrada ===
+unarias derivables: exp log sin cos tan sinh cosh tanh sqrt asin acos atan expm1 log1p log2 log10 gamma lgamma digamma trigamma psigamma pnorm dnorm 
+binarias derivables: + - * / ^ 
+unarias NO derivables: abs sign asinh acosh atanh besselJ floor ceiling round trunc max min plogis dlogis exp2 
+binarias NO derivables: %% %/% 
+R: R version 4.6.1 (2026-06-24) 
+MEDICION-STATSD-FIN

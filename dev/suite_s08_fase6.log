@@ -1,0 +1,91 @@
+ball-certificate: ..............................................................................
+elementary: ...............................................................................................................................
+expression: ..............................
+gate-ball: 
+  GATE 6 / P1: 200 instancias, dim 1 a 8, peor cociente 1.0000
+..  GATE 6 / P3: 500 matrices, 126 diagonales con cota ajustada
+...  GATE 6 / P4: 16801 casos donde lo dirigido rechaza y lo ingenuo acepta; 0 al reves
+..
+gate-elementary-vs-mpfr: ................
+GATE 2 observed error of the evaluation path in use, in ulps, against the published figure and the declared slack:
+   fun     n  e_obs e_pub slack   used
+   exp 20019 1.2788 0.511     3 0.4263
+   log 20015 0.5030 0.520     3 0.1677
+   sin 20019 0.8573 0.516     3 0.2858
+   cos 20019 1.1839 0.516     3 0.3946
+   tan 20019 0.6620 0.619     3 0.2207
+  sinh 20019 1.4763 1.930     5 0.2953
+  cosh 20019 0.9842 1.930     5 0.1968
+  tanh 20019 1.9427 2.210     6 0.3238
+  sqrt 20017 0.5000 0.500     2 0.2500
+ expm1 20019 0.9956 0.913     3 0.3319
+ log1p 18990 0.6853 0.899     3 0.2284
+  log2 20015 0.4995 0.548     3 0.1665
+ log10 20015 1.3523 1.620     5 0.2705
+  asin 20015 0.5072 0.516     3 0.1691
+  acos 20015 0.5089 0.523     3 0.1696
+  atan 20019 0.6618 0.523     3 0.2206
+Slacks the sweep found tight (used above 0.80): none
+Functions where the path in use exceeded the published scalar figure: exp, sin, cos, tan, expm1, atan
+.................................
+CP-1 mis-rounded points found on the mesh, by function:
+  exp   log   sin   cos   tan  sinh  cosh  tanh  sqrt expm1 log1p  log2 log10 
+   92     2    47    75    62  1307   207  2292     0   249   217     2   516 
+ asin  acos  atan 
+   22    17    41 
+...................................
+gate-expression: ........................
+GATE 3 routes that contributed, and the widest enclosure met:
+                  expr                       routes    max_wid
+                     a           natural+mean_value 4.941e-324
+                 a * Z natural+mean_value+monotonic  1.123e+01
+             a * Z + 1 natural+mean_value+monotonic  1.087e+01
+       a * Z + b * Z^2 natural+mean_value+monotonic  2.991e+01
+               a * Z^3 natural+mean_value+monotonic  3.716e+01
+               b * Z^2 natural+mean_value+monotonic  2.770e+01
+             r + b * Z natural+mean_value+monotonic  5.567e+00
+           r + b * Z^2 natural+mean_value+monotonic  2.602e+01
+                 r * Z natural+mean_value+monotonic  3.776e+00
+     r * Z * (1 - Z/K) natural+mean_value+monotonic  6.691e+00
+       r * Z + b * Z^2 natural+mean_value+monotonic  2.338e+01
+       r * Z + b * Z^3 natural+mean_value+monotonic  1.746e+02
+               r - Z^2 natural+mean_value+monotonic  2.939e+01
+           r * Z - Z^2 natural+mean_value+monotonic  2.158e+01
+           r * Z - Z^3 natural+mean_value+monotonic  1.239e+02
+          exp(Z) - Z^2 natural+mean_value+monotonic  2.921e+02
+       sin(Z) * cos(Z) natural+mean_value+monotonic  2.000e+00
+           tanh(Z) + Z natural+mean_value+monotonic  7.333e+00
+     atan(Z)/(1 + Z^2) natural+mean_value+monotonic  2.398e+00
+       exp(sin(Z)) - Z natural+mean_value+monotonic  7.965e+00
+   Z * sin(Z) - cos(Z) natural+mean_value+monotonic  1.229e+01
+   sinh(Z) - Z - Z^3/6 natural+mean_value+monotonic  8.446e+01
+ (Z - 1) * (Z + 1) * Z natural+mean_value+monotonic  1.256e+02
+           Z/(2 + Z^2) natural+mean_value+monotonic  2.666e+00
+...................................................................................................
+gate-kernel-vs-mpfr: ........................
+GATE 1 excess width in steps (lower + upper), by operation:
+         n   mean q99 max
+add 100000 1.0527   2   2
+sub 100000 1.0646   2   2
+mul 100000 1.0497   2   2
+div  46098 0.9992   2   2
+...............
+gate-newton: ...................................................................
+interval-class: ..................................................................................................................................................
+mpfr-bridge: ......S.................
+newton: ....................................Unique roots: 1  Not excludable: 0
+Excluded boxes: 0  Boxes processed: 3
+Budget exhausted: no  Rigorously verified: yes
+.
+operator-table: .....................................................................................S.
+rounding: ....................................
+safeguards: .....................................
+
+══ Skipped ═════════════════════════════════════════════════════════════════════
+1. without the backend the bridge refuses by name instead of guessing ('test-mpfr-bridge.R:23:3') - Reason: the backend is installed, so this path is unreachable
+
+2. the verifier refuses the fourth criterion rather than skipping it silently ('test-operator-table.R:184:3') - Reason: the backend is installed, so this path is unreachable
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+
+TOTAL  PASS 920  FAIL 0  WARN 0  SKIP 2  ERROR 0

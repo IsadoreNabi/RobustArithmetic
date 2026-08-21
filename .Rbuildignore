@@ -1,0 +1,7 @@
+^LICENSE\.md$
+^.*\.Rcheck$
+^.*\.tar\.gz$
+^NOTES-.*\.md$
+^NOTES-.*\.pdf$
+^dev$
+^\.knit$

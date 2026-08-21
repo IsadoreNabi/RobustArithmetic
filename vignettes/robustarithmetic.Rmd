@@ -1,0 +1,192 @@
+---
+title: "Verified interval arithmetic in pure R"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Verified interval arithmetic in pure R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(RobustArithmetic)
+```
+
+## What this package guarantees, and what it does not
+
+Every operation in this package returns an **enclosure**: an interval that provably contains
+the exact real result. Not an estimate of it, not an error bar around it. If the true answer
+is a real number `y`, then `y` lies inside the returned interval, and that statement is a
+theorem about the code rather than an observation about a sample of inputs.
+
+The guarantee is deliberately narrow. An enclosure that contains the answer may still be
+wide, and a wide enclosure is honest but not useful. Throughout the package the two
+properties are kept apart and reported apart: **validity** is never traded for **tightness**,
+and where a result cannot be tightened the package says so instead of narrowing it.
+
+Conformance with IEEE Std 1788.1-2017 is **not** claimed, for the reason the standard itself
+gives: its subclause 1.5 makes conformance a list of requirements an implementation shall
+satisfy, with no partial grade available. What is followed, measured one requirement at a
+time, is documented in `?RobustArithmetic` and summarised at the end of this vignette.
+
+## The kernel: intervals and outward rounding
+
+An interval is built from its endpoints and carries a decoration that records what is known
+about the operation that produced it.
+
+```{r}
+x <- ra_interval(1, 2)
+y <- ra_interval(3, 4)
+ra_add(x, y)
+ra_mul(x, y)
+```
+
+The endpoints of a computed interval are rounded **outward**, so the enclosure can only grow
+and never silently shrink past the true result. R offers no way to change the processor's
+rounding mode, and changing it would not be a local act in any case: it is per-thread state
+of the processor, so it would govern every floating-point operation executed afterwards on
+that thread, inside this package or anywhere else. Outward rounding is therefore obtained
+arithmetically, from the predecessor and successor formulas of Rump, Zimmermann, Boldo and
+Melquiond (2009), which are valid under round-to-nearest.
+
+```{r}
+ra_pred(1)
+ra_succ(1)
+```
+
+Division by an interval containing zero is where a naive implementation quietly returns
+nonsense. Here it returns the mathematically correct answer, which is a *pair* of intervals,
+through the extended division of the interval Newton literature.
+
+```{r}
+ra_div_extended(ra_interval(1, 2), ra_interval(-1, 1))
+```
+
+## Elementary functions at two levels
+
+Elementary functions are provided at two levels, and the difference between them is a
+difference in what can be proved rather than a difference in speed alone.
+
+The **fast** level evaluates over the system math library and widens the result by a declared
+slack derived from published accuracy measurements. The **rigorous** level evaluates over
+`Rmpfr` with a directed-rounding bridge. When a verdict would otherwise fall inside the slack
+— that is, when the fast level cannot decide the question being asked — the package escalates
+through a ladder of precisions rather than returning a confident answer it cannot defend.
+
+```{r}
+ra_elem("exp", ra_interval(0, 1))
+ra_has_mpfr()
+```
+
+The slack is not a tuning knob chosen for convenience. It is measured against the library
+actually installed, which matters more than it sounds: R does not call the system libm along
+a single fixed path, so a bound published for one library does not certify what R computes.
+`ra_measure_library_error()` is the instrument that measures it.
+
+## Expressions, and why the centered form exists
+
+Evaluating an expression by substituting an interval for each occurrence of the variable —
+the **natural extension** — is valid but often loose, because each occurrence is treated as
+if it varied independently of the others. The **centered** extension trades that looseness
+for a derivative bound.
+
+```{r}
+ra_eval_natural(quote(x^2 - x), list(x = ra_interval(0, 1)))
+ra_enclose_expr(quote(x^2 - x), ra_interval(0, 1))
+```
+
+The natural extension gives `[-1, 1]`; `ra_enclose_expr()` gives `[-0.75, 0.25]`, which is the
+exact range. Neither form is uniformly better and the package does not pretend otherwise, so
+`ra_enclose_expr()` takes the best of the methods it is given —- natural, mean value and a
+monotonicity test -— rather than committing to one.
+
+## Roots: the interval Newton operator
+
+`ra_solve()` finds roots of a univariate expression over a box and returns, for each one, a
+word about what was established. The engine is the Hansen-Sengupta operator with extended
+division and epsilon-inflated candidate verification, driven by a subdivision (paving) loop.
+
+```{r}
+ra_solve(quote(x^2 - 2), ra_interval(0, 2))
+```
+
+The important property is the failure mode. The loop has a budget, and when the budget runs
+out it **abstains by name** and prints what it spent, rather than returning a smaller set of
+roots as though the search had been exhaustive. An abstention is information; a silently
+truncated answer is not.
+
+## Fixed points in higher dimensions, without interval matrices
+
+The solver above is univariate by contract. For fixed points of maps on `R^n` the package
+takes a different route, and the route is the point of the design: the whole certificate is a
+**scalar inequality**, so a fixed point in `R^n` is certified without interval matrices,
+without factorisations and without an interval spectral decomposition. The norm collapses the
+dimension into three numbers, and the caller may bound those three numbers by any means they
+can defend.
+
+```{r}
+ra_ball_certificate(rho = 0.2, lipschitz = 0.5)
+```
+
+Two theorems are applied and the object says which one decided the verdict. **Confinement**
+— the map carries the ball into itself — gives existence by Brouwer and says nothing about
+what happens inside. **Contraction** adds uniqueness and convergence by Banach. They are
+certified separately because they are not the same statement, and a package that reported one
+word for both would be reporting less than it knows.
+
+```{r}
+ra_ball_certificate(rho = 0.24, lipschitz = 1.6, radius = 0.4, image_radius = 0.4)
+```
+
+That second call is confined but not contractive: the image radius route needs no Lipschitz
+constant, which is why it is not redundant.
+
+Two assemblers help build the three inputs in the matrix case without factorising anything:
+`ra_gershgorin()` encloses eigenvalues from the matrix entries, and `ra_spectral_sum()` bounds
+a spectral quantity of a sum from bounds on its terms.
+
+```{r}
+ra_gershgorin(matrix(c(2, 0.1, 0.1, 3), 2, 2))
+```
+
+**The responsibility that cannot be delegated:** the three bounds must be measured in the same
+norm, and the package cannot check that. The label travels with the object. Mixing norms
+silently would be a failure mode indistinguishable, at run time, from a valid certificate.
+Likewise the Lipschitz constant must hold over the whole ball and not merely at its centre; a
+caller who bounds the derivative at the centre receives a certificate that means nothing, and
+no arithmetic can detect it. In one dimension the package closes that loop itself, in
+`ra_certify_fixed_point()`.
+
+## A refusal certifies nothing
+
+This is worth stating on its own, because it is the most common way a verified result is
+misread. The hypotheses behind every certificate here are **sufficient and not necessary**.
+There is no test of exclusion in this package and no word of demonstrated absence. A map that
+this package declines to certify may still have a fixed point in the ball; a root that the
+solver does not report may still exist inside a box the budget never reached. What the
+package proves, it proves; what it declines, it declines without claiming the opposite.
+
+## What is covered, and what is not
+
+Measured against IEEE Std 1788.1-2017, one requirement at a time: the interval type and the
+decoration system of clause 5; 22 of the 39 arithmetic operations of Table 4.1; and the seven
+numeric functions of Table 4.3. What is **not** provided is the cancellative operations, the
+interval comparison relations, the text input and output of subclause 6.8, the interchange
+representation of subclause 7.3, and the tightest accuracy that subclause 6.5.2 requires of
+the basic operations — which here are one unit in the last place wider at each end.
+
+`ra_operator_table()` prints the coverage as data rather than as prose, and
+`ra_verify_operator_table()` checks the claim against the code.
+
+## References
+
+Hansen, E., & Walster, G. W. (2004). *Global optimization using interval analysis* (2nd ed.).
+Marcel Dekker.
+
+Neumaier, A. (1990). *Interval methods for systems of equations*. Cambridge University Press.
+
+Rump, S. M. (2010). Verification methods: Rigorous results using floating-point arithmetic.
+*Acta Numerica*, 19, 287-449.
+
+Rump, S. M., Zimmermann, P., Boldo, S., & Melquiond, G. (2009). Computing predecessor and
+successor in rounding to nearest. *BIT Numerical Mathematics*, 49(2), 419-431.
