@@ -5,20 +5,48 @@ alcanza si la suite ya dio limpio y sólo queda commitear.
 
 ---
 
-## ESTADO: CERRADO. No queda trabajo pendiente.
+## ESTADO
 
-Todo lo de abajo es **registro**, no agenda. Se terminó el 2026-08-21:
+**Dos trabajos, los dos terminados. Todo lo de abajo es registro, no agenda.**
 
-- Suite con **todos** los portones (`NOT_CRAN=true`): **955 aserciones, 0 fallos, 0 errores,
-  2 saltadas** (rutas inalcanzables porque el backend SÍ está instalado).
-- `R CMD check --as-cran`: **0 errores, 0 avisos, 1 NOTE** («New submission»).
-- **Commit `a89065d`** en `main`, autor único José Mauricio. **NO se hizo `push`**: eso es
-  hacia afuera y queda a criterio suyo (`git push origin main`).
-- Aviso a QuantDialectics dejado en `~/QuantDialectics/AVISO_ROBUSTARITHMETIC_SALIDA_6_8_3.md`.
+### 1. La salida de texto (IEEE 1788.1 §6.8.3) — cerrado, commits `a89065d` y `5613aec`
 
-**Lo único que podría quedar por hacer, y es de QD y no de acá:** cerrar el §211 de
-`NOTES-FASE-B.md` de QuantDialectics con el resultado, y corregir ahí el criterio de contención,
-que tal como está escrito daría por buena una forma que no lo es. Está explicado en el aviso.
+Detalle completo más abajo y en el §6 de `NOTES-RobustArithmetic.md`.
+
+### 2. El pretest de CRAN — cerrado
+
+Llegó después: **1 ERROR en Debian, 1 ERROR en Windows (13 fallos)**. **No los causó la reparación
+del §6**: el log de CRAN imprime `[2.718282, 7.389056]_com`, o sea el formato **viejo**. CRAN probó
+el tarball anterior.
+
+La causa era una sola y estaba **en el banco, no en el paquete**. El paquete envía centinelas
+medidos y un ancla del entorno donde se midieron; en Windows la libm excedió la holgura declarada,
+el portón degradó el nivel rápido y **el paquete lo dijo 197 veces**, que es S2 y S5 funcionando.
+Lo que fallaba eran aserciones que codificaban la máquina del autor:
+
+1. `test-safeguards.R:90` afirmaba `length(a$mismatch) == 0` — o sea, que la máquina que corre las
+   pruebas **es** la máquina de los centinelas. Ahora afirma que un desajuste, donde lo haya,
+   **nombra el campo**; el control positivo del ancla adulterada quedó.
+2. Cuatro pruebas (las tres de propagación S3 y la CP-7 de la escalera) presuponían el nivel rápido
+   en uso. Ahora lo **mantienen abierto mientras duran** y restauran el estado al salir: son sobre
+   la contabilidad y sobre la escalera, no sobre la exactitud de ninguna libm.
+3. `test-elementary.R:173` afirmaba `observed <= slack`, que es sobre **esta** máquina. Ahora lo
+   afirma donde puede ser cierto y, donde no, afirma lo único que nunca puede fallar: **que el
+   paquete se dio cuenta**.
+4. Y `test-safeguards.R:78` no fallaba por lo que miraba: el portón sólo audita mientras el nivel
+   rápido **no** está ya degradado. Faltaba salvar y limpiar `fast_degraded`.
+
+**Verificado reproduciendo las dos condiciones de CRAN acá**, no conjeturando: ancla adulterada, y
+`ra_measure_library_error` sustituida por una que devuelve `observed = slack + 1`.
+
+| escenario | antes | ahora |
+| --- | --- | --- |
+| esta máquina | 0 fallos | **0** (164 ok) |
+| ancla desajustada (Debian) | 1 fallo | **0** (166 ok) |
+| libm rota + ancla desajustada (Windows) | 13 fallos | **0** (166 ok) |
+
+La NOTE de ortografía no se toca: quedó explicada en `cran-comments.md`, que es donde va.
+Registro en el **§7** de `NOTES-RobustArithmetic.md`.
 
 ---
 

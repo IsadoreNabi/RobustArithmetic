@@ -66,28 +66,46 @@ test_that("S5: a degraded fast level speaks, never silence", {
 
 test_that("S2: with the backend present, the first fast use audits the route", {
   skip_if_not(ra_has_mpfr(), "the audit needs Rmpfr")
+  ## the degradation flag is saved and cleared along with the audit flags:
+  ## the gate only audits while the fast level is not already degraded, so a
+  ## session that degraded earlier -- which is what happens wherever the
+  ## sentinels do not describe the machine -- would never reach the code this
+  ## test is about. The measurement itself is not forced to any outcome: what
+  ## is restored afterwards is exactly what was found.
   old_audited <- .ra_state$fast_audited
   old_audit <- .ra_state$fast_audit
+  old_degraded <- .ra_state$fast_degraded
   on.exit({
     assign("fast_audited", old_audited, envir = .ra_state)
     assign("fast_audit", old_audit, envir = .ra_state)
+    assign("fast_degraded", old_degraded, envir = .ra_state)
   }, add = TRUE)
   assign("fast_audited", FALSE, envir = .ra_state)
   assign("fast_audit", NULL, envir = .ra_state)
-  invisible(ra_elem("exp", ra_interval(0, 1)))
+  assign("fast_degraded", FALSE, envir = .ra_state)
+  suppressWarnings(invisible(ra_elem("exp", ra_interval(0, 1))))
   expect_true(.ra_state$fast_audited)
   m <- .ra_state$fast_audit
   expect_true(is.data.frame(m) && nrow(m) == 16L)
   ## cached: a second use must not re-measure (the object is the same one)
-  invisible(ra_elem("log", ra_interval(1, 2)))
+  suppressWarnings(invisible(ra_elem("log", ra_interval(1, 2))))
   expect_identical(.ra_state$fast_audit, m)
 })
 
 test_that("S4: the environment anchor is named and the comparison can fail", {
   a <- ra_environment_anchor()
   expect_true(all(c("libm", "r_version", "jit_level") %in% names(a$anchor)))
-  ## the current environment matches the anchor it was generated on
-  expect_length(a$mismatch, 0L)
+  ## WHETHER the current environment matches is a fact about the machine and
+  ## not about this package, so it is not asserted: the sentinels were
+  ## generated somewhere, and everywhere else the honest answer is a mismatch.
+  ## What IS asserted is that a mismatch, when there is one, names the field
+  ## it is about -- the anchor has to explain and not merely flag.
+  expect_type(a$mismatch, "character")
+  for (one in a$mismatch) {
+    expect_true(any(vapply(names(a$anchor),
+                           function(k) grepl(k, one, fixed = TRUE),
+                           logical(1L))))
+  }
   ## and the comparator can fail for what it watches: a doctored anchor must
   ## be reported, and the report must NAME what differs
   fake <- .ra_anchor
@@ -98,6 +116,17 @@ test_that("S4: the environment anchor is named and the comparison can fail", {
 })
 
 test_that("S3: provenance is carried, propagated by weakness, and printed", {
+  ## the fast level is held open for the length of this test. What is under
+  ## test here is the BOOKKEEPING -- that "measured" is attached, propagated by
+  ## weakness, carried through subsetting and printed -- and that is a property
+  ## of this package, not of the accuracy of the machine's library. Where the
+  ## library does not honour the declared slack the gate escalates to the
+  ## rigorous level, every enclosure comes back a theorem, and there would be
+  ## no measured provenance left to propagate: the test would be measuring the
+  ## machine instead of the code. The degradation itself is tested in S5.
+  old_degraded <- .ra_state$fast_degraded
+  on.exit(assign("fast_degraded", old_degraded, envir = .ra_state), add = TRUE)
+  assign("fast_degraded", FALSE, envir = .ra_state)
   a <- ra_interval(1, 2)
   expect_identical(ra_prov(a), "theorem")
   f <- ra_elem("exp", a)
@@ -126,6 +155,10 @@ test_that("S3: provenance is carried, propagated by weakness, and printed", {
 })
 
 test_that("S3: the weakest provenance also flows through expressions", {
+  ## held open for the same reason as the test above
+  old_degraded <- .ra_state$fast_degraded
+  on.exit(assign("fast_degraded", old_degraded, envir = .ra_state), add = TRUE)
+  assign("fast_degraded", FALSE, envir = .ra_state)
   got <- ra_enclose_expr(quote(exp(x) + 1), ra_interval(0, 1))
   expect_identical(ra_prov(got), "measured")
   if (ra_has_mpfr()) {

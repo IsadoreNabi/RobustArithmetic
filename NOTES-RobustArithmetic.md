@@ -1010,3 +1010,69 @@ no imprime, y eso quedo escrito en la pagina de `ra_show`.
 - **Cerrar 6.8.3 no da conformidad**: la clausula 1 exige ademas 6.8.2 y 7.3, y la 1788.1 no tiene
   grado parcial (§5 de estas notas). El argumento para reparar era de **correccion**, no de
   conformidad, y asi quedo escrito.
+
+---
+
+## §7. El pretest de CRAN: un banco que afirmaba la MAQUINA y no el codigo
+
+Llego el 2026-08-21: **1 ERROR en Debian (R-devel, glibc 2.42) y 1 ERROR en Windows Server 2022**,
+los dos desde la suite. **Los dos por la misma causa, y la causa estaba en el banco.**
+
+**Primero, lo que NO fue:** no lo causo la reparacion del §6. Se ve en el propio log de CRAN, que
+imprime `[2.718282, 7.389056]_com` — el formato **viejo**, al mas cercano y a siete cifras. CRAN
+probo el tarball anterior. Los 14 fallos son anteriores.
+
+### §7.1. Lo que paso, que es el paquete funcionando
+
+Este paquete envia **centinelas medidos** —el error observado de la libreria matematica del sistema
+sobre dieciseis funciones— y un **ancla** que registra el entorno donde se midieron. Las
+salvaguardas existen justamente porque otra maquina puede no honrarlos. En Windows la libreria
+**excedio la holgura declarada**, el porton degrado el nivel rapido, toda evaluacion escalo al
+riguroso con aviso, y el paquete lo dijo **197 veces**. Eso no es un defecto: es S2 y S5 haciendo
+exactamente lo suyo.
+
+En Debian la libreria si honro la holgura; lo unico que difirio fue el ancla (R 4.7.0 contra 4.6.1,
+glibc 2.42 contra 2.43).
+
+### §7.2. Los tres defectos del banco
+
+1. **`test-safeguards.R:90` afirmaba `length(a$mismatch) == 0`**, o sea **que la maquina que corre
+   las pruebas ES la maquina donde se generaron los centinelas**. Solo puede pasar ahi. Y el nombre
+   de la prueba —«the environment anchor is named and the comparison can fail»— no pedia eso.
+   Ahora afirma lo que si es propiedad del paquete: que un desajuste, donde lo haya, **nombra el
+   campo** del que habla. El control positivo del ancla adulterada se conservo.
+2. **Cuatro pruebas presuponian que el nivel rapido estaba en uso** (las tres de propagacion de
+   procedencia S3 y la CP-7 de la escalera). Con el nivel rapido degradado, todo vuelve `theorem` y
+   no queda procedencia `measured` que propagar; y la escalera arranca ya en el peldano riguroso,
+   asi que no hay de donde subir. Esas pruebas son sobre la **contabilidad** y sobre la **escalera**,
+   no sobre la exactitud de ninguna libreria: ahora **mantienen abierto el nivel rapido mientras
+   duran** y restauran el estado de sesion al salir. La degradacion se prueba aparte y sin condicion.
+3. **`test-elementary.R:173` afirmaba `observed <= slack`**, que es una afirmacion sobre **esta**
+   maquina y la holgura se midio en otra. Ahora la afirma donde puede ser cierta, y donde no,
+   afirma lo que nunca puede fallar: **que el paquete se dio cuenta**. Una libreria que rompe la
+   cota publicada y un paquete que no lo dice es el unico desenlace que esa prueba existe para
+   prohibir.
+
+Hermano del §6.5 y de la misma familia: **`test-safeguards.R:78` no fallaba por lo que miraba**. El
+porton solo audita mientras el nivel rapido **no** esta ya degradado, asi que una sesion degradada
+antes nunca llegaba al codigo que esa prueba interroga. Faltaba salvar y limpiar `fast_degraded`
+junto con las dos banderas de auditoria.
+
+### §7.3. Como se verifico, que es lo que hace que esto no sea una opinion
+
+**Se reprodujeron las dos condiciones de CRAN en esta maquina**, no se conjeturaron: el ancla
+adulterada para que reporte desajuste, y `ra_measure_library_error` sustituida por una que devuelve
+`observed = slack + 1`, que degrada el nivel rapido de verdad por el camino de verdad.
+
+| escenario | fallos antes | fallos ahora |
+| --- | --- | --- |
+| esta maquina, ancla coincidente | 0 | **0** (164 ok) |
+| ancla desajustada (Debian en CRAN) | 1 | **0** (166 ok) |
+| libm que rompe la holgura + ancla desajustada (Windows en CRAN) | 13 | **0** (166 ok) |
+
+### §7.4. La NOTE de ortografia
+
+`Boldo`, `Melquiond`, `Zimmermann` y `Sengupta` son apellidos citados; `cancellative` y `subclause`
+son las palabras que usa la propia IEEE 1788.1 y cambiarlas volveria mas dificil cotejar la
+declaracion de conformidad contra la norma, que es para lo que esta; `precisions` es el plural del
+sustantivo. **No se toco la prosa**: quedo explicado en `cran-comments.md`, que es donde va.
