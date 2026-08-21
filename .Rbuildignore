@@ -5,3 +5,5 @@
 ^NOTES-.*\.pdf$
 ^dev$
 ^\.knit$
+^AVISO_.*\.md$
+^PROMPT_SESION_.*\.md$

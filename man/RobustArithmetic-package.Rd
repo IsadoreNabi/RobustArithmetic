@@ -92,10 +92,19 @@ The package is organised in levels.
       last place at each end, which is what makes the enclosure provable
       without a rounding mode. What holds is the weakest mode, \emph{valid},
       and it holds by theorem rather than by measurement.
-    \item \strong{6.8, input and output} -- absent. What [format.ra_ivl()]
-      produces is a console rendering for a reader, not the
-      \code{intervalToText} of 6.8.3: it rounds for legibility and therefore
-      does not preserve containment, which that subclause requires.
+    \item \strong{6.8.3, output} -- provided ([ra_interval_to_text()]), and
+      [format.ra_ivl()] encloses in the same way, differing only in spelling
+      the infinities as R does and in carrying the provenance marker. The
+      criterion met is the one 6.6.2 fixes: the value of the literal
+      \code{[l, u]} is the mathematical interval \code{[l, u]}, the decimals
+      read exactly, and not the weaker "the string reads back to the same
+      double". Tightness is left implementation-defined by the subclause and
+      is declared here: the value of the string is contained in
+      \code{[ra_pred(lo), ra_succ(hi)]}. The uncertain form of 6.6.2 is not
+      emitted, and no conversion specifier selects it.
+    \item \strong{6.8.2, input} -- absent, and with it \code{textToInterval}
+      and the interval literals of 6.6 as an input syntax. Text produced by
+      this package is a valid literal; text is not read back.
     \item \strong{7.3, interchange representation} -- absent.
   }
 

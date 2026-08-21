@@ -56,14 +56,49 @@ The empty interval prints as the word for it and not as the reversed
   reader to stop looking for it, and the decoration is precisely the field
   that must be read on the results that look ordinary.
 
-  \strong{This is a console rendering and not the text output of the
-  standard.} Subclause 6.8.3 of IEEE Std 1788.1-2017 asks of
-  \code{intervalToText} that the string contain the interval it came from,
-  and rendering for a reader rounds: the enclosure whose endpoints are the
-  predecessor and the successor of one prints as \code{[1, 1]}, which
-  contains neither. The figures are for reading. The endpoints themselves
-  are in \code{x$lo} and \code{x$hi}, and \code{as.data.frame()} carries
-  them unrounded, which is where a reader who needs them goes.
+  \strong{The printed pair encloses the interval, and the reader is owed
+  that and not a tidy number.} Subclause 6.8.3 of IEEE Std 1788.1-2017 asks
+  of \code{intervalToText} that the string contain the interval it came
+  from, and subclause 6.6.2 fixes what a string means: the value of the
+  literal \code{[l, u]} is the \emph{mathematical} interval \code{[l, u]},
+  that is, the decimals read exactly. Rounding each endpoint to nearest --
+  which is what every printing default in R does -- breaks that: the
+  enclosure whose endpoints are the predecessor and the successor of one
+  would print as \code{[1, 1]}, which contains neither. So the lower
+  endpoint is rounded down and the upper endpoint up, each to the fewest
+  digits that carry the proof.
+
+  Two consequences a reader meets immediately. An endpoint prints with as
+  many digits as its \emph{value} needs and not as many as its neighbour
+  needs, so \code{[0.1, 0.2]} prints its endpoints at different lengths: the
+  double nearest \code{0.1} is above the decimal \code{0.1}, so \code{0.1}
+  is a true lower bound, while the double nearest \code{0.2} is also above
+  the decimal \code{0.2}, so \code{0.2} is not a true upper bound and the
+  next one is printed. And a degenerate interval prints as two different
+  decimals, because a degenerate interval of doubles is not a real number:
+  it is everything that rounds to one.
+
+  Numbers that are decimals exactly -- \code{-2.5}, \code{3.75},
+  \code{1e-3}, every power of two -- print exactly as they did, at their own
+  length, because for them rounding down and rounding up are the number
+  itself. Nothing is paid where nothing is owed.
+
+  \strong{What the widening costs is bounded and declared.} The printed
+  enclosure is contained in \code{[ra_pred(lo), ra_succ(hi)]}: printing an
+  enclosure never costs more than one operation of the arithmetic costs, and
+  the width on the page is the width in the object to within that.
+
+  \strong{What it costs in time is declared too}, because it is not free:
+  each endpoint is proved rather than formatted, which is of the order of a
+  millisecond, and distinct values are the unit, so a vector whose endpoints
+  repeat costs what its distinct endpoints cost. Printing the handful of
+  intervals a session looks at is imperceptible; formatting a vector of
+  thousands is seconds, and a caller in that position wants
+  \code{as.data.frame()}, which does no proving because it does no printing.
+  The
+  endpoints themselves are in \code{x$lo} and \code{x$hi}, and
+  \code{as.data.frame()} carries them unrounded, which is where a reader who
+  needs the doubles goes.
 }
 
 \section{Dependencies}{

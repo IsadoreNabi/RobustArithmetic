@@ -725,7 +725,8 @@ de graduarse y enumerar.
 | `decorationPart`, `setDec` | 6.7.8 | provistas |
 | `newDec` expuesta, `intervalPart`, orden de decoraciones | 6.7.8 | ausentes |
 | exactitud **`tightest`** de las operaciones basicas | 6.5.2 | **no se cumple** |
-| entrada y salida de texto | 6.8 | ausentes |
+| salida de texto (`intervalToText`) | 6.8.3 | **provista** (§6) |
+| entrada de texto (`textToInterval`) | 6.8.2 | ausente |
 | representacion de intercambio | 7.3 | ausente |
 
 Las 17 que faltan de la Tabla 4.1: `recip`, `fma`, `pow`, `exp2`, `exp10`, `atan2`, `asinh`,
@@ -779,6 +780,10 @@ es universal.
    manda al lector a `x$lo`, `x$hi` y `as.data.frame()`, que llevan los extremos sin redondear.
    **No se cambio el comportamiento**: cambiar como imprime todo intervalo es decision de diseno
    con costo en los dos paquetes, y lo que estaba mal era la afirmacion, no la cifra que se ve.
+   > **Superado por el §6.** El comportamiento SI se cambio despues, y la frase de arriba
+   > —«costo en los dos paquetes»— era una estimacion que la medicion desmintio: el costo estaba
+   > en otro lado y era chico. Lo que esta linea describe es lo que se decidio en la 83, no lo que
+   > el paquete hace.
 2. **La divergencia del constructor queda como divergencia** (D-83.5). La letra de 6.7.5 decide
    la mitad sola: un constructor que falla **devuelve un dato Y senala** la excepcion
    `UndefinedOperation`, o sea que lo que la norma prohibe es fallar en silencio y no fallar en
@@ -897,3 +902,111 @@ y la fixtura de impresion.
   derivar el algebra en papel antes de escribir codigo: `_sa_dsig` devolvia `alpha` veces la derivada
   en su rama de argumento chico, y `_matriz_J` salia ASIMETRICA en esa misma rama. Reparados alla, con
   bateria nueva en su suite (**949/949**) y con su chequeo bit-exacto en 0 fallos.
+
+---
+
+## §6. La reparacion de la salida: un renglon impreso es una afirmacion
+
+Pedido por el autor a partir del `AVISO_QD_FORMAT_RA_IVL.md` que dejo la sesion 85 de
+QuantDialectics. **El diagnostico del aviso era correcto y su reparacion propuesta no**, y las dos
+cosas se establecieron midiendo, no discutiendo.
+
+### §6.1. El criterio, que el aviso tenia mal
+
+6.8.3 dice que la cadena debe contener al intervalo, y **6.6.2 dice que significa la cadena**: el
+valor del literal `[l, u]` es el intervalo **matematico** `[l, u]`, o sea los decimales leidos
+exactos. El aviso uso otro criterio —«la cadena vuelve a leerse como el mismo double»— y con ese
+criterio recomendo la **representacion de ida y vuelta mas corta**. Medido con Rmpfr a 400 bits,
+esa forma **falla 6.8.3 en tres de cinco casos**, incluido el ejemplo central del propio aviso:
+para el double `0.1 + 5e-17` la cadena mas corta que vuelve es `0.10000000000000006`, cuyo valor
+exacto queda **por debajo** del extremo. La forma parece contener y no contiene.
+
+Y en la otra direccion: el «hacia afuera infla nueve ordenes de magnitud» del aviso era artefacto
+de fijar **siete** cifras. Dirigido a las cifras que el numero tiene, el ancho impreso queda en
+razon 1,00001 y **cuesta entre −2 y +1 caracteres**.
+
+### §6.2. Las dos clases de numero impreso
+
+La reparacion entera sale de separar dos cosas que se imprimian igual:
+
+- **El numero que ACOTA un desconocido** —un extremo, un ancho, una cota de error, las premisas
+  del certificado— se redondea en la direccion que deja la oracion verdadera, cueste las cifras
+  que cueste.
+- **El numero que IDENTIFICA el dato sobre el que se corrio** —el radio de la bola certificada—
+  se reproduce: la cadena mas corta que vuelve al mismo double. El confinamiento de una bola no
+  implica el de ninguna otra, ni mayor ni menor, asi que ahi redondear en cualquier direccion
+  afirma algo que no se probo.
+
+`format.ra_ivl` era el primer caso; la tarjeta de `format.ra_certificate` tenia **los dos**, y el
+aviso no la habia mirado. Medido sobre el `@examples` que el paquete envia,
+`ra_ball_certificate(0.2, 0.5)`: cota verdadera `0.40000000000000013`, renglon impreso **«the
+centre is within 0.4 of it»**. `%.6g` redondea al mas cercano y ahi afirmaba una cota **mas
+ajustada que la certificada**.
+
+### §6.3. El motor, y de que depende su correccion
+
+`R/decimal.R`. La garantia se apoya en dos cosas y en ninguna mas: que la conversion de decimal a
+binario es **monotona** —lo es, porque es un redondeo— y que sumar o restar una unidad a la ultima
+cifra **de la cadena** es exacto. Todo lo demas es busqueda de estrechez y no puede romper la
+contencion.
+
+Tres pruebas se admiten y ninguna otra. Si la conversion cae estrictamente de un lado, la
+monotonia decide. Si cae **sobre** el extremo, hay dos salidas: la **rejilla** —`v` esta sobre la
+rejilla de paso `10^p` si y solo si tiene a lo sumo `-p` bits fraccionarios, que es aritmetica y
+no comparacion, y es lo que mantiene `-2.5` imprimiendose `-2.5`— y la **comparacion exacta**, que
+lleva el significando decimal como suma exacta de dos doubles y escala por potencias de diez en
+etapas con cota de error derivada, y **contesta solo donde la cota lo certifica**. Lo que no se
+certifica se declina, y declinar mueve una cifra hacia afuera: nunca se lee un signo del error.
+
+**Holgura declarada:** el encierro impreso queda contenido en `[ra_pred(lo), ra_succ(hi)]`.
+Imprimir no cuesta mas que lo que cuesta una operacion de la aritmetica.
+
+### §6.4. Lo medido
+
+Contra Rmpfr a 400 bits, 9038 comprobaciones sobre adversariales (decimales exactos, subnormales,
+potencias de dos, los dos extremos del rango, `1e23`, `2^53+1`) y aleatorios de todo el rango:
+
+| propiedad | fallos |
+| --- | --- |
+| contencion de Nivel 1 (6.6.2 + 6.8.3) | **0** |
+| holgura dentro de un paso de redondeo | **0** |
+| optimalidad (mover la ultima cifra hacia adentro rompe la contencion) | **0** |
+
+Con **control positivo**: el mismo porton corrido sobre `format()` de R —al mas cercano, siete
+cifras— falla, que es lo que prueba que el porton mide lo que dice medir. Y un segundo control
+positivo sobre el `%.6g` viejo de la tarjeta.
+
+**La suite entera con TODOS los portones encendidos (`NOT_CRAN=true`, los de Rmpfr incluidos):
+955 aserciones, 0 fallos, 0 errores, 0 avisos, 2 saltadas** —las dos, rutas inalcanzables porque
+el backend SI esta instalado—. `R CMD check --as-cran`: **0 errores, 0 avisos, 1 NOTE**
+(«New submission»).
+
+**Rendimiento, declarado porque no es gratis:** del orden de un milisegundo por extremo
+**distinto**, porque cada uno se prueba en vez de formatearse; los extremos repetidos se cobran una
+sola vez. `format()` de mil intervalos tarda ~1,6 s —arranco en 12,5 s y se optimizo sacando el
+motor de expresiones regulares del camino caliente y convirtiendo los candidatos desde sus digitos
+en vez de desde su renderizado—. Quien tenga miles quiere `as.data.frame()`, que no prueba porque
+no imprime, y eso quedo escrito en la pagina de `ra_show`.
+
+### §6.5. Defectos propios que salieron en el camino
+
+1. **`formatC(flag = "0")` rellena una cadena con espacios, no con ceros.** Metia `NA` en los
+   digitos y la comparacion exacta se declinaba sin decirlo; costaba una cifra en `1e23`. Se
+   escribio el relleno a mano.
+2. **`paste0()` trata un argumento de largo cero como cadena vacia**, asi que `format()` de un
+   vector vacio de intervalos devolvia **un** renglon de puntuacion en vez de ninguno. Defecto
+   anterior a esta sesion. Reparado con guarda de largo.
+3. **El acoplamiento de `format()` sobre el vector.** Un extremo de `1e-31` en una tarjeta de
+   `ra_solve` arrastraba a **todos** los demas a `1.000000e+00`: siete cifras y notacion
+   cientifica para el numero 1. Cada extremo se rinde ahora por su propio valor y la tarjeta de
+   `x^3 - x` muestra las tres raices con la precision que cada una tiene.
+
+### §6.6. Lo que no se hizo, y por que
+
+- **La forma incierta `m?r` de 6.6.2 no se emite.** Es mas corta para un intervalo angosto —para
+  `[pi, pi]`, 22 caracteres contra 40— y ningun especificador la selecciona. Nada depende de ella,
+  y una forma a medio escribir es peor que ausente.
+- **6.8.2 (`textToInterval`) sigue ausente.** El paquete produce literales validos; no los lee.
+- **Cerrar 6.8.3 no da conformidad**: la clausula 1 exige ademas 6.8.2 y 7.3, y la 1788.1 no tiene
+  grado parcial (§5 de estas notas). El argumento para reparar era de **correccion**, no de
+  conformidad, y asi quedo escrito.

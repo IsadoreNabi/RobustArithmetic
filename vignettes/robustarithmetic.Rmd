@@ -171,9 +171,12 @@ package proves, it proves; what it declines, it declines without claiming the op
 Measured against IEEE Std 1788.1-2017, one requirement at a time: the interval type and the
 decoration system of clause 5; 22 of the 39 arithmetic operations of Table 4.1; and the seven
 numeric functions of Table 4.3. What is **not** provided is the cancellative operations, the
-interval comparison relations, the text input and output of subclause 6.8, the interchange
+interval comparison relations, the text **input** of subclause 6.8.2, the interchange
 representation of subclause 7.3, and the tightest accuracy that subclause 6.5.2 requires of
-the basic operations — which here are one unit in the last place wider at each end.
+the basic operations — which here are one unit in the last place wider at each end. The text
+**output** of subclause 6.8.3 is provided, by `ra_interval_to_text()` and by the printing of
+every interval: the pair of decimals on the page encloses the pair of doubles underneath,
+which is what that subclause asks and what rounding each endpoint to nearest would break.
 
 `ra_operator_table()` prints the coverage as data rather than as prose, and
 `ra_verify_operator_table()` checks the claim against the code.

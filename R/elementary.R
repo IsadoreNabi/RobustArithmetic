@@ -762,7 +762,9 @@ summary.ra_escalation <- function(object, ...) {
 print.ra_escalation_summary <- function(x, ...) {
   cat("Function:  ", x$fun, "\n", sep = "")
   cat("Argument:  ", x$argument, "\n", sep = "")
-  cat("Enclosure: ", x$interval, "  width ", format(x$width), "\n", sep = "")
+  ## the width bounds how much is not known, so it is rounded up: printed short
+  ## it would claim a narrower enclosure than the one that was computed
+  cat("Enclosure: ", x$interval, "  width ", .ra_card_up(x$width), "\n", sep = "")
   cat("Budget:    ",
       if (is.na(x$bits)) "fast level" else paste0(x$bits, " bits"), "\n",
       sep = "")

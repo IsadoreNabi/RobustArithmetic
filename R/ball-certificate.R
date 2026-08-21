@@ -210,7 +210,8 @@ ra_ball_certificate <- function(rho, lipschitz = NULL, radius = NULL,
     reason <- if (is.na(r_use)) {
       "no radius was supplied and none could be computed."
     } else {
-      sprintf("the ball of radius %.17g is not carried into itself by either route.", r_use)
+      sprintf("the ball of radius %s is not carried into itself by either route.",
+              .ra_card_fid(r_use))
     }
   }
   ## The error bound on the centre is (T4) and needs the contraction: without
@@ -417,23 +418,30 @@ format.ra_certificate <- function(x, ...) {
   ln <- character(0)
   ln <- c(ln, sprintf("fixed point certificate over a ball in the %s norm", x$norm))
   if (x$confined) {
-    ln <- c(ln, sprintf("  confinement : certified by the %s route, radius %.6g",
-                        x$route, x$radius))
+    ## the radius IDENTIFIES the ball that was certified, and confinement of
+    ## one ball implies confinement of no other, larger or smaller: so this
+    ## number is reproduced and not rounded in either direction
+    ln <- c(ln, sprintf("  confinement : certified by the %s route, radius %s",
+                        x$route, .ra_card_fid(x$radius)))
   } else {
     ln <- c(ln, "  confinement : not certified")
   }
   if (x$contraction) {
     ln <- c(ln, sprintf("  contraction : certified, the fixed point is unique in the ball"))
-    ln <- c(ln, sprintf("  the centre is within %.6g of it", x$error_bound))
+    ## and this one BOUNDS an unknown distance, so it goes up: printed short it
+    ## would claim a tighter certificate than the one that was earned
+    ln <- c(ln, sprintf("  the centre is within %s of it", .ra_card_up(x$error_bound)))
   } else if (x$confined) {
     ln <- c(ln, "  contraction : not certified, so what happens inside is not claimed")
   } else {
     ln <- c(ln, "  contraction : not certified")
   }
   if (nzchar(x$reason)) ln <- c(ln, paste0("  reason      : ", x$reason))
-  ln <- c(ln, sprintf("  bounds used : rho %.6g, L %s, image %s", x$rho,
-                      if (is.na(x$lipschitz)) "not given" else sprintf("%.6g", x$lipschitz),
-                      if (is.na(x$image_radius)) "not given" else sprintf("%.6g", x$image_radius)))
+  ## the three premises are upper bounds (see .ra_upper()), and each of them
+  ## printed short would make the certificate look easier to earn than it was
+  ln <- c(ln, sprintf("  bounds used : rho %s, L %s, image %s", .ra_card_up(x$rho),
+                      if (is.na(x$lipschitz)) "not given" else .ra_card_up(x$lipschitz),
+                      if (is.na(x$image_radius)) "not given" else .ra_card_up(x$image_radius)))
   ln <- c(ln, sprintf("  provenance  : %s", x$prov))
   ln
 }
@@ -524,7 +532,8 @@ format.ra_summary_certificate <- function(x, ...) {
     sprintf("  confinement %s, contraction %s",
             if (x$confined) "certified" else "not certified",
             if (x$contraction) "certified" else "not certified"),
-    if (x$confined) sprintf("  radius %.6g", x$radius) else "  no radius certified")
+    if (x$confined) sprintf("  radius %s", .ra_card_fid(x$radius))
+    else "  no radius certified")
 }
 
 #' @title Print the summary of a fixed point certificate
