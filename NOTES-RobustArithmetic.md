@@ -1076,3 +1076,27 @@ adulterada para que reporte desajuste, y `ra_measure_library_error` sustituida p
 son las palabras que usa la propia IEEE 1788.1 y cambiarlas volveria mas dificil cotejar la
 declaracion de conformidad contra la norma, que es para lo que esta; `precisions` es el plural del
 sustantivo. **No se toco la prosa**: quedo explicado en `cran-comments.md`, que es donde va.
+
+### §7.5. Barrido de basura, y un cabo suelto que se cerro midiendo
+
+**Restos de `testthat` versionados desde el commit inicial.** `tests/testthat/_problems/` y
+`testthat-problems.rds` entraron en `037ff30` y venian viajando en el repositorio **y en el
+tarball**: son la reproduccion de un fallo del 20/08 en `test-interval-class.R:228` que **ya no
+existe** —esa prueba pasa—. Nada en `R/`, en `tests/`, en `man/` ni en los metadatos los
+referenciaba: se comprobo antes de sacarlos. Quitados del control de versiones y del disco, con
+regla en `.gitignore` **y** en `.Rbuildignore` para que un fallo futuro no los devuelva al tarball.
+Verificado: `R CMD check --as-cran` sigue en 0 errores, 0 avisos, 1 NOTE, y `tar tzf` ya no los
+encuentra adentro.
+
+**El cabo suelto de la auditoria del 24/08.** Quedaba sin explicar por que el directorio
+`tests/testthat` tenia fecha 15:13 del 21/08, once minutos despues del ultimo commit. **Era la
+corrida de la suite completa lanzada desde esta misma sesion**, cuyo registro
+(`~/ra_suite_allgates.log`) llevaba exactamente esa hora: `testthat` escribe y despues borra su
+archivo de problemas al terminar en verde, y eso mueve la fecha del directorio sin dejar nada.
+No hubo terceros. Se anota porque la explicacion no se supuso: se leyo de la fecha del registro.
+
+**Y una copia de la wiki suelta.** `~/ra_wiki` era una copia sin git, **anterior** a la
+actualizacion del 21/08 —imprimia todavia `# [4, 6]_com`— y por lo tanto una version deprecada en
+paralelo de las paginas. Se verifico que es **identica al commit `353ca5e`** de la wiki antes de
+borrarla: el contenido esta preservado en el historial y no se perdio nada. Las copias canonicas
+son el repositorio de la wiki y `LIBRERIAS EN R/Robust Arithmetic/Wiki/`.

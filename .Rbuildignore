@@ -8,3 +8,5 @@
 ^AVISO_.*\.md$
 ^PROMPT_SESION_.*\.md$
 ^cran-comments\.md$
+^tests/testthat/_problems$
+^tests/testthat/testthat-problems\.rds$

@@ -3,3 +3,5 @@
 .Rproj.user/
 .Rhistory
 .RData
+tests/testthat/_problems/
+tests/testthat/testthat-problems.rds
