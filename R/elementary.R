@@ -437,7 +437,9 @@ ra_verify_monotonicity <- function(classes = NULL, n = 4001L, span = 8) {
 #'   beside the error published for the system math library.
 #' @param n An integer scalar, how many arguments to try per function. Defaults
 #'   to 20000.
-#' @param seed An integer scalar seeding the arguments. Defaults to 80.
+#' @param seed An integer scalar seeding the arguments, or \code{NULL}, the
+#'   default, in which case the state of the random number generator is left
+#'   exactly as the caller had it and no seed is set inside the function.
 #' @param bits An integer scalar, the working precision of the referent.
 #'   Defaults to 300.
 #' @return A data frame with one row per admitted function and the columns
@@ -474,17 +476,19 @@ ra_verify_monotonicity <- function(classes = NULL, n = 4001L, span = 8) {
 #'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
 #' @examples
 #' if (ra_has_mpfr()) {
-#'   head(ra_measure_library_error(n = 500L), 4)
+#'   head(ra_measure_library_error(n = 500L, seed = 80L), 4)
 #' }
 #' @seealso [ra_slack()] and [ra_elem()].
 #' @export
-ra_measure_library_error <- function(n = 20000L, seed = 80L, bits = 300L) {
+ra_measure_library_error <- function(n = 20000L, seed = NULL, bits = 300L) {
   if (!ra_has_mpfr()) {
     ra_stop("no_mpfr",
             paste0("Measuring the library error needs package 'Rmpfr', which ",
                    "is not installed: there is nothing to measure against."))
   }
-  set.seed(seed)
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   funs <- names(.ra_shape)
   out <- data.frame(fun = funs, n = 0L, observed = NA_real_,
                     published = .ra_ulp_glibc[funs],
@@ -528,6 +532,11 @@ ra_measure_library_error <- function(n = 20000L, seed = 80L, bits = 300L) {
 #' @param n An integer scalar, how many probe points to draw per exponent.
 #'   Defaults to 16.
 #' @param max_exponent An integer scalar, where to stop looking. Defaults to 80.
+#' @param seed An integer scalar seeding the probe points, or \code{NULL}, the
+#'   default, in which case the state of the random number generator is left
+#'   exactly as the caller had it and no seed is set inside the function. The
+#'   two levels probe the same points either way, because the points are drawn
+#'   once and shared, not redrawn per level.
 #' @return A list with the probe width, the measured exponent at each level, the
 #'   exponent predicted by the spacing of the format, and a witness magnitude
 #'   below the fast frontier where the enclosure is strictly narrower than the
@@ -563,14 +572,19 @@ ra_measure_library_error <- function(n = 20000L, seed = 80L, bits = 300L) {
 #' @seealso [ra_elem()].
 #' @export
 ra_periodic_frontier <- function(rel_width = 2^-20, n = 16L,
-                                 max_exponent = 80L) {
+                                 max_exponent = 80L, seed = NULL) {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   predicted <- ceiling(log2(2 * pi / rel_width))
+  ## drawn once and shared by both levels, so that the comparison between the
+  ## fast and the rigorous frontier is over the same probe points
+  draws <- matrix(stats::runif(n * (max_exponent + 1L)), nrow = n)
   scan_one <- function(level) {
-    set.seed(80L)
     witness <- NA_real_
     frontier <- NA_integer_
     for (e in seq.int(0L, max_exponent)) {
-      a <- 2^e * (1 + stats::runif(n))
+      a <- 2^e * (1 + draws[, e + 1L])
       x <- ra_interval(a, ra_succ(a + a * rel_width))
       w <- ra_wid(ra_elem("sin", x, level = level))
       if (any(w < 2) && is.na(frontier)) witness <- max(a[w < 2])

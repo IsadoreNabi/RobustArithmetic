@@ -2,7 +2,7 @@
 
 ## Test environments
 
-- local: Fedora 44, R 4.6.1, glibc 2.43
+- local: Fedora 44, R 4.6.1, glibc 2.43 (`R CMD check --as-cran`, 2026-09-01)
 - CRAN pretest: Debian sid, R-devel (2026-08-19 r90430), gcc 16.2.0
 - CRAN pretest: Windows Server 2022, R-devel (2026-08-17 r90424 ucrt)
 
@@ -10,8 +10,8 @@
 
 0 errors | 0 warnings | 1 note
 
-The note is `New submission`, together with the list of possibly misspelled
-words in DESCRIPTION. All of them are intended:
+The note is `New submission`. Where the incoming check also lists possibly
+misspelled words in DESCRIPTION, all of them are intended:
 
 - **Boldo**, **Melquiond**, **Zimmermann**, **Sengupta** are surnames of cited
   authors (Rump, Zimmermann, Boldo and Melquiond 2009, for the predecessor and
@@ -22,6 +22,27 @@ words in DESCRIPTION. All of them are intended:
   standard, which is the point of stating it.
 - **precisions** is the plural of the noun, used for the rungs of the precision
   ladder.
+
+## Response to the manual review of 2026-09-01
+
+Both requests are implemented as the CRAN cookbook prescribes.
+
+1. **References in the Description field now auto-link.** The predecessor and
+   successor formulas are credited as
+   `Rump, Zimmermann, Boldo and Melquiond (2009) <doi:10.1007/s10543-009-0218-z>`,
+   and the standard whose conformance is discussed is linked as
+   `IEEE Std 1788.1-2017 <doi:10.1109/IEEESTD.2018.8277144>`, with no space
+   after `doi:` and angle brackets for auto-linking. Both DOIs were verified to
+   resolve to the cited works.
+2. **No function sets a seed to a specific number any more.** The two exported
+   functions that did (`ra_measure_library_error()`, which had `seed = 80L` as
+   a default, and `ra_periodic_frontier()`, which called `set.seed(80L)`
+   internally) now take `seed = NULL` and call `set.seed()` only when the user
+   supplies one, exactly per the cookbook template. The internal seed of
+   `ra_periodic_frontier()` existed so that its two measurement levels probed
+   the same points; that is now achieved by drawing the points once and sharing
+   them, which needs no seed. Tests and examples pass an explicit seed, where
+   setting one is encouraged.
 
 ## Response to the pretest failures of 2026-08-21
 

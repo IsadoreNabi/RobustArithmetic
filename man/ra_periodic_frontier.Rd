@@ -4,7 +4,12 @@
 \alias{ra_periodic_frontier}
 \title{Where the periodic enclosures stop resolving, and why}
 \usage{
-ra_periodic_frontier(rel_width = 2^-20, n = 16L, max_exponent = 80L)
+ra_periodic_frontier(
+  rel_width = 2^-20,
+  n = 16L,
+  max_exponent = 80L,
+  seed = NULL
+)
 }
 \arguments{
 \item{rel_width}{A numeric scalar, the width of the probe interval as a
@@ -14,6 +19,12 @@ fraction of its magnitude. Defaults to \code{2^-20}.}
 Defaults to 16.}
 
 \item{max_exponent}{An integer scalar, where to stop looking. Defaults to 80.}
+
+\item{seed}{An integer scalar seeding the probe points, or \code{NULL}, the
+default, in which case the state of the random number generator is left
+exactly as the caller had it and no seed is set inside the function. The
+two levels probe the same points either way, because the points are drawn
+once and shared, not redrawn per level.}
 }
 \value{
 A list with the probe width, the measured exponent at each level, the

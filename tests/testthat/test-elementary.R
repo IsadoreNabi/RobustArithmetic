@@ -166,7 +166,7 @@ test_that("the evaluation path in use is not the correctly rounded one", {
 
 test_that("the error of the path in use is measured against the publication", {
   skip_if_not(ra_has_mpfr(), "the measurement needs Rmpfr")
-  m <- ra_measure_library_error(n = 3000L)
+  m <- ra_measure_library_error(n = 3000L, seed = 80L)
   expect_identical(nrow(m), 16L)
   expect_true(all(c("observed", "published", "slack", "used") %in% names(m)))
   ## The claim -- that the declared slack covers what the path in use actually
@@ -213,7 +213,7 @@ test_that("the periodic frontier is set by the format, not by the reduction", {
   ## at which the sine of a box stops resolving below the whole range is
   ## governed by the width of the box against the period, not by the precision
   ## of the argument reduction. The criterion can fail in both directions.
-  fr <- ra_periodic_frontier(rel_width = 2^-20)
+  fr <- ra_periodic_frontier(rel_width = 2^-20, seed = 80L)
   expect_false(is.na(fr$fast_exponent))
   expect_true(abs(fr$fast_exponent - fr$granularity_exponent) <= 1L)
   ## below the frontier the enclosure is strictly narrower than [-1, 1]
@@ -281,7 +281,7 @@ test_that("the rigorous level does not move the periodic frontier", {
   ## reduction buy at most one exponent, because the box width and not the
   ## rounding is what puts an integer in the index interval.
   skip_if_not(ra_has_mpfr(), "the rigorous level needs Rmpfr")
-  fr <- ra_periodic_frontier(rel_width = 2^-20)
+  fr <- ra_periodic_frontier(rel_width = 2^-20, seed = 80L)
   expect_false(is.na(fr$rigorous_exponent))
   expect_true((fr$rigorous_exponent - fr$fast_exponent) %in% c(0L, 1L))
 })

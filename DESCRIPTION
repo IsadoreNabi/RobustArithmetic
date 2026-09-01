@@ -5,18 +5,19 @@ Version: 0.1.0
 Authors@R: person(given = "Jose Mauricio",
                   family = "Gomez Julian",
                   role = c("aut", "cre"),
-                  email = "mauriciogomezjulian@gmail.com",
+                  email = "isadore.nabi@pm.me",
                   comment = c(ORCID = "0009-0000-2412-3150"))
 Description: Verified interval arithmetic for R, in the inf-sup (endpoint)
     representation of the set-based flavor of the interval standard. Every
     operation returns an enclosure that provably contains the exact result:
     outward rounding is obtained from the predecessor and successor formulas of
-    Rump, Zimmermann, Boldo and Melquiond (2009), which are valid under
-    round-to-nearest and therefore need no change to the floating-point
-    rounding mode. That mode is not reachable from R, and changing it would not
-    be a local act: it is per-thread state of the processor, so it would govern
-    every floating-point operation executed afterwards on that thread, in this
-    package or anywhere else. Elementary functions are provided at two
+    Rump, Zimmermann, Boldo and Melquiond (2009)
+    <doi:10.1007/s10543-009-0218-z>, which are valid under round-to-nearest and
+    therefore need no change to the floating-point rounding mode. That mode is
+    not reachable from R, and changing it would not be a local act: it is
+    per-thread state of the processor, so it would govern every floating-point
+    operation executed afterwards on that thread, in this package or anywhere
+    else. Elementary functions are provided at two
     levels: a fast level over the system math library, widened by a declared
     slack derived from published accuracy measurements, and a rigorous level
     over 'Rmpfr' with a directed-rounding bridge, reached by an escalation
@@ -26,9 +27,10 @@ Description: Verified interval arithmetic for R, in the inf-sup (endpoint)
     interval Newton operator with extended division and epsilon-inflated
     candidate verification, and a subdivision (paving) engine whose only
     failure mode is a named abstention with its budget printed. Conformance
-    with IEEE Std 1788.1-2017 is not claimed, and the reason is the standard's
-    own: its subclause 1.5 makes conformance a list of requirements that an
-    implementation shall satisfy, with no partial grade to claim. What this
+    with IEEE Std 1788.1-2017 <doi:10.1109/IEEESTD.2018.8277144> is not
+    claimed, and the reason is the standard's own: its subclause 1.5 makes
+    conformance a list of requirements that an implementation shall satisfy,
+    with no partial grade to claim. What this
     package follows, measured one requirement at a time and stated in the
     package documentation, is the interval type and the decoration system of
     clause 5, 22 of the 39 arithmetic operations of Table 4.1, and the seven

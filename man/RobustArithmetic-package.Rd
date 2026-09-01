@@ -162,11 +162,11 @@ Institute of Electrical and Electronics Engineers. (2015). IEEE standard for
   level.
 }
 \author{
-\strong{Maintainer}: Jose Mauricio Gomez Julian \email{mauriciogomezjulian@gmail.com} (\href{https://orcid.org/0009-0000-2412-3150}{ORCID})
+\strong{Maintainer}: Jose Mauricio Gomez Julian \email{isadore.nabi@pm.me} (\href{https://orcid.org/0009-0000-2412-3150}{ORCID})
 
 Authors:
 \itemize{
-  \item Jose Mauricio Gomez Julian \email{mauriciogomezjulian@gmail.com} (\href{https://orcid.org/0009-0000-2412-3150}{ORCID})
+  \item Jose Mauricio Gomez Julian \email{isadore.nabi@pm.me} (\href{https://orcid.org/0009-0000-2412-3150}{ORCID})
 }
 
 }

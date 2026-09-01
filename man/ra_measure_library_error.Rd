@@ -4,13 +4,15 @@
 \alias{ra_measure_library_error}
 \title{Measure the error of the evaluation path the fast level actually uses}
 \usage{
-ra_measure_library_error(n = 20000L, seed = 80L, bits = 300L)
+ra_measure_library_error(n = 20000L, seed = NULL, bits = 300L)
 }
 \arguments{
 \item{n}{An integer scalar, how many arguments to try per function. Defaults
 to 20000.}
 
-\item{seed}{An integer scalar seeding the arguments. Defaults to 80.}
+\item{seed}{An integer scalar seeding the arguments, or \code{NULL}, the
+default, in which case the state of the random number generator is left
+exactly as the caller had it and no seed is set inside the function.}
 
 \item{bits}{An integer scalar, the working precision of the referent.
 Defaults to 300.}
@@ -60,7 +62,7 @@ The slack of the fast level is \code{ceiling(2 * e + 1)} units in the
 
 \examples{
 if (ra_has_mpfr()) {
-  head(ra_measure_library_error(n = 500L), 4)
+  head(ra_measure_library_error(n = 500L, seed = 80L), 4)
 }
 }
 \references{

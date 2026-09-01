@@ -158,7 +158,7 @@ test_that("GATE 2A: the correctly rounded value is inside the fast enclosure", {
   ## very points this gate asserted containment on; the exported measurement is
   ## a standalone instrument over its own mesh, and it has to reach the same
   ## verdict about the slack or one of the two is measuring something else.
-  m <- ra_measure_library_error(n = 5000L)
+  m <- ra_measure_library_error(n = 5000L, seed = 80L)
   expect_true(all(is.na(m$observed) | m$observed <= m$slack))
 })
 
