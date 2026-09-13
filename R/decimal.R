@@ -136,19 +136,28 @@
   is.finite(tp$hi) && tp$hi == v && tp$lo == 0
 }
 
-## A decimal integer of up to eighteen digits as an exact sum of two doubles.
+## A decimal integer of up to nineteen digits as an exact sum of two doubles.
 ##
-## Seventeen digits overflow the fifty-three bits of a double, so the obvious
-## as.numeric() loses the last digit or two -- and the last digit is the whole
-## question here. The residual is recovered from the decimal side, where it is
-## exact: R prints an integer-valued double with %.0f without rounding it,
-## because there is nothing to round, so the difference between that print and
-## the digits is the error the conversion committed, and it is taken by decimal
-## subtraction, which has no error of its own.
+## The first fifteen digits and the remaining at most four are read separately;
+## each is therefore an exactly representable integer on every R build. Their
+## arithmetic combination is an integer-valued double close to the digits, and
+## its residual is recovered from the decimal side: R prints that integer with
+## %.0f without rounding it, because there is nothing to round, and decimal
+## subtraction has no error of its own. No longer decimal is needed by the
+## eighteen-digit search and its possible outward carry.
 .ra_int_dd <- function(D) {
-  hi <- suppressWarnings(as.numeric(D))
+  n <- nchar(D)
+  if (n > 19L) return(NULL)
+  if (n <= 15L) {
+    hi <- suppressWarnings(as.numeric(D))
+    if (!is.finite(hi)) return(NULL)
+    return(list(hi = hi, lo = 0))
+  }
+  lead <- suppressWarnings(as.numeric(substr(D, 1L, 15L)))
+  tail <- suppressWarnings(as.numeric(substring(D, 16L)))
+  if (!is.finite(lead) || !is.finite(tail)) return(NULL)
+  hi <- lead * 10^(n - 15L) + tail
   if (!is.finite(hi)) return(NULL)
-  if (nchar(D) <= 15L) return(list(hi = hi, lo = 0))
   lo <- .ra_dec_sub(D, sprintf("%.0f", hi))
   if (is.null(lo)) return(NULL)
   list(hi = hi, lo = lo)
@@ -188,9 +197,10 @@
   s <- sprintf("%.*e", k - 1L, abs(v))
   ## the layout of %e is fixed -- one digit, a point when there is more than
   ## one, then k - 1 digits -- so the exponent starts at a position that is
-  ## known and does not have to be searched for. This is called seventeen times
-  ## per endpoint printed, which is why it is written with substr and not with
-  ## a regular expression.
+  ## known and does not have to be searched for. The bounding search calls this
+  ## at most eighteen times per endpoint and the datum-reproduction search at
+  ## most seventeen, which is why it uses substr rather than a regular
+  ## expression.
   i <- if (k == 1L) 2L else k + 2L
   D <- if (k == 1L) substr(s, 1L, 1L) else
     paste0(substr(s, 1L, 1L), substr(s, 3L, i - 1L))
@@ -258,35 +268,23 @@
   paste0(if (neg) "-" else "", body)
 }
 
-## The value of the digits, without laying them out. as.numeric() reads the
-## bare scientific form, so no rendering is needed to ask what a candidate is
-## worth -- and the search asks that seventeen times for every one it keeps.
+## The value to which R maps the digits, without laying them out. This parser is
+## used only for reproducing a datum in .ra_exact1(), where equality with R's
+## result is the claim being tested. A parsed value is never evidence about
+## which side of a mathematical decimal a binary endpoint lies on.
 .ra_value <- function(neg, D, p) {
   suppressWarnings(as.numeric(paste0(if (neg) "-" else "", D, "e", p)))
 }
 
 ## Is the decimal +-D * 10^p certified to lie on the required side of v?
 ##
-## Three proofs are admitted and nothing else. The first two need no arithmetic
-## beyond what R already guarantees: decimal-to-binary conversion is a rounding
-## and therefore monotone, so a converted value strictly below v proves the
-## decimal is below v, and one strictly above proves the decimal is above. Only
-## when the conversion lands exactly on v is the question open, and then the
-## third proof, the exact comparison, decides it. When none of the three
+## Two proofs are admitted and nothing else. Exact grid membership proves
+## equality. Otherwise .ra_cmp_dec() compares the decimal with the endpoint
+## from an exact double-double significand and a derived scaling-error bound;
+## it returns a side only when that side is certified. When neither proof
 ## answers, the caller moves a digit outward. An undecided case is never read
 ## as a pass.
 .ra_safe <- function(D, p, neg, v, up, on_grid) {
-  ## the candidate is converted from its raw digits and exponent rather than
-  ## from its rendering: the two have the same value, and only the accepted
-  ## candidate is worth laying out on a page
-  y <- .ra_value(neg, D, p)
-  if (is.na(y)) return(FALSE)
-  if (up && y > v) return(TRUE)
-  if (!up && y < v) return(TRUE)
-  if (y != v) return(FALSE)
-  ## the conversion landed on v, so the decimal is within half a rounding step
-  ## of it and the question is which side. Equality first, because it is the
-  ## common case and the only one decided exactly; then the sign.
   if (on_grid) return(TRUE)
   cmp <- .ra_cmp_dec(D, p, neg, v)
   !is.na(cmp) && (if (up) cmp > 0L else cmp < 0L)
@@ -298,12 +296,11 @@
 ## The two requirements are of different kinds and are kept apart on purpose.
 ## Containment is a theorem: the string returned satisfies it by the proof
 ## above, at every digit count, always. Tightness is a search: among the
-## candidates that satisfy it, the first one no looser than [ra_pred(v),
-## ra_succ(v)] is taken, so that printing an enclosure never costs more than
-## one operation of the arithmetic costs. If the search fails the last
-## certified candidate is returned, which is loose but still true; if
-## certification itself fails the function stops, because a printed bound that
-## was not proved is exactly what this file exists to prevent.
+## candidates that satisfy it, the first one certified to be no looser than
+## [ra_pred(v), ra_succ(v)] is taken, so that printing an enclosure never costs
+## more than one operation of the arithmetic costs. If either certification
+## fails the function stops, because an unproved printed claim is exactly what
+## this file exists to prevent.
 .ra_bound1 <- function(v, up) {
   if (is.nan(v)) return("NaN")
   if (is.na(v)) return(NA_character_)
@@ -312,8 +309,7 @@
   neg <- v < 0
   target <- if (up) ra_succ(v) else ra_pred(v)
   q <- .ra_frac_bits(v)
-  keep <- NULL
-  for (k in 1:17) {
+  for (k in 1:18) {
     pr <- .ra_sci(v, k)
     D <- pr$D
     ## the grid certificate belongs to the digits sprintf produced, not to the
@@ -326,13 +322,19 @@
       on_grid <- FALSE
     }
     if (!ok) next
-    ys <- .ra_value(neg, D, pr$p)
-    if (if (up) ys <= target else ys >= target) return(.ra_render(neg, D, pr$p))
-    keep <- list(D = D, p = pr$p)
+    ## Tightness is another exact-decimal claim and is certified by the same
+    ## comparison, this time against the adjacent outward double. At the two
+    ## finite-range edges the adjacent value is zero or infinite, and the sign
+    ## plus the already-certified containment decides without arithmetic.
+    tight <- if (!is.finite(target) || target == 0) TRUE else {
+      cmp <- .ra_cmp_dec(D, pr$p, neg, target)
+      !is.na(cmp) && (if (up) cmp < 0L else cmp > 0L)
+    }
+    if (tight) return(.ra_render(neg, D, pr$p))
   }
-  if (!is.null(keep)) return(.ra_render(neg, keep$D, keep$p))
   ra_stop("internal", paste0(
-    "no certified decimal bound could be produced for ", sprintf("%.17g", v),
+    "no certified decimal bound of the declared width could be produced for ",
+    sprintf("%.17g", v),
     ". This is a defect in the package, not in the call: please report it."))
 }
 

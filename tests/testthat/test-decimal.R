@@ -1,9 +1,10 @@
 ## The printed line is an assertion, and this file is where it is checked
-## against something outside itself. The oracle is Rmpfr: the decimal string is
+## against something outside itself. One oracle is Rmpfr: the decimal string is
 ## read exactly at four hundred bits and compared with the endpoint, which is
 ## the criterion of 6.6.2 and 6.8.3 and not the weaker round trip through a
-## double. Where the oracle is unavailable a necessary condition still runs,
-## because a gate that only runs on one machine is not a gate.
+## double. Where Rmpfr is unavailable, an exact base-R referent reconstructs
+## the binary endpoint and compares decimal integers digit by digit, because a
+## gate that only runs on one machine is not a gate.
 
 ## the values a decimal renderer breaks on, gathered rather than sampled:
 ## exact decimals, values that only look like them, both ends of the exponent
@@ -25,6 +26,118 @@
     2^round(stats::runif(n, -1070, 1020)),
     (seq_len(n)) / 7,
     sqrt(seq_len(n)))
+}
+
+## Exact base-R referent for the tests that run without Rmpfr. A double is
+## read from sprintf("%a") as N * 2^e, which is its exact hexadecimal form.
+## For e < 0 this is N * 5^-e * 10^e; for e >= 0 it is the integer N * 2^e.
+## The products use base-10^7 limbs and factors small enough that every
+## intermediate integer stays below 2^53. Decimal bounds can then be compared
+## digit by digit, without sending them through R's decimal parser and without
+## calling anything from R/decimal.R.
+.exact_base <- 10000000
+
+.exact_big_from_double <- function(x) {
+  out <- numeric(0)
+  repeat {
+    q <- floor(x / .exact_base)
+    out <- c(out, x - q * .exact_base)
+    x <- q
+    if (x == 0) return(out)
+  }
+}
+
+.exact_big_mul <- function(a, m) {
+  carry <- 0
+  for (i in seq_along(a)) {
+    z <- a[i] * m + carry
+    q <- floor(z / .exact_base)
+    a[i] <- z - q * .exact_base
+    carry <- q
+  }
+  while (carry > 0) {
+    q <- floor(carry / .exact_base)
+    a <- c(a, carry - q * .exact_base)
+    carry <- q
+  }
+  a
+}
+
+.exact_big_pow_mul <- function(a, b, e, chunk) {
+  while (e > 0L) {
+    step <- min(e, chunk)
+    a <- .exact_big_mul(a, b^step)
+    e <- e - step
+  }
+  a
+}
+
+.exact_big_character <- function(a) {
+  hi <- sprintf("%.0f", a[length(a)])
+  if (length(a) == 1L) return(hi)
+  paste0(hi, paste(sprintf("%07.0f", rev(a[-length(a)])), collapse = ""))
+}
+
+.exact_binary_decimal <- function(v) {
+  if (v == 0) return(list(sign = 0L, D = "0", p = 0L))
+  h <- sprintf("%a", abs(v))
+  m <- regmatches(h, regexec(
+    "^0x([0-9a-f])(?:[.]([0-9a-f]+))?p([+-][0-9]+)$", h,
+    perl = TRUE))[[1L]]
+  stopifnot(length(m) == 4L)
+  frac <- if (is.na(m[3L]) || !nzchar(m[3L])) "" else m[3L]
+  hd <- strsplit(paste0(m[2L], frac), "", fixed = TRUE)[[1L]]
+  value <- match(hd, c(as.character(0:9), letters[1:6])) - 1L
+  N <- 0
+  for (d in value) N <- N * 16 + d
+  e <- as.integer(m[4L]) - 4L * nchar(frac)
+  a <- .exact_big_from_double(N)
+  if (e >= 0L) {
+    a <- .exact_big_pow_mul(a, 2, e, 20L)
+    p <- 0L
+  } else {
+    a <- .exact_big_pow_mul(a, 5, -e, 10L)
+    p <- e
+  }
+  D <- .exact_big_character(a)
+  while (nchar(D) > 1L && substr(D, nchar(D), nchar(D)) == "0") {
+    D <- substr(D, 1L, nchar(D) - 1L)
+    p <- p + 1L
+  }
+  list(sign = if (v < 0) -1L else 1L, D = D, p = p)
+}
+
+.exact_parse_decimal <- function(s) {
+  m <- regmatches(s, regexec(
+    "^(-?)([0-9]+)(?:[.]([0-9]+))?(?:e([+-][0-9]+))?$", s,
+    perl = TRUE))[[1L]]
+  stopifnot(length(m) == 5L)
+  frac <- if (is.na(m[4L]) || !nzchar(m[4L])) "" else m[4L]
+  exponent <- if (is.na(m[5L]) || !nzchar(m[5L])) 0L else as.integer(m[5L])
+  D <- sub("^0+(?=[0-9])", "", paste0(m[3L], frac), perl = TRUE)
+  list(sign = if (D == "0") 0L else if (m[2L] == "-") -1L else 1L,
+       D = D, p = exponent - nchar(frac))
+}
+
+.exact_cmp_magnitude <- function(a, b) {
+  ea <- nchar(a$D) + a$p
+  eb <- nchar(b$D) + b$p
+  if (ea != eb) return(if (ea < eb) -1L else 1L)
+  n <- max(nchar(a$D), nchar(b$D))
+  da <- utf8ToInt(paste0(a$D, strrep("0", n - nchar(a$D))))
+  db <- utf8ToInt(paste0(b$D, strrep("0", n - nchar(b$D))))
+  i <- which(da != db)
+  if (!length(i)) return(0L)
+  if (da[i[1L]] < db[i[1L]]) -1L else 1L
+}
+
+.exact_cmp_decimal_double <- function(s, v) {
+  a <- .exact_parse_decimal(s)
+  b <- .exact_binary_decimal(v)
+  if (a$sign != b$sign) return(if (a$sign < b$sign) -1L else 1L)
+  if (a$sign == 0L) return(0L)
+  cmp <- .exact_cmp_magnitude(a, b)
+  if (a$sign > 0L) cmp else -cmp
 }
 
 test_that("a printed bound is on the side of its endpoint that it claims", {
@@ -104,16 +217,29 @@ test_that("no shorter digit at the same length would have done", {
   expect_identical(slack, character(0))
 })
 
-test_that("the necessary condition holds without the backend as well", {
-  ## monotonicity of decimal-to-binary conversion: a decimal below the endpoint
-  ## cannot convert to a double above it. This is weaker than the gate above
-  ## and it runs everywhere, including on CRAN
+test_that("printed bounds contain tightly against an exact base-R referent", {
   vs <- c(.ra_adversarial(), .ra_random_doubles(40L))
   vs <- vs[is.finite(vs) & vs != 0]
-  lo <- vapply(vs, function(v) as.numeric(.ra_bound1(v, FALSE)), numeric(1L))
-  hi <- vapply(vs, function(v) as.numeric(.ra_bound1(v, TRUE)), numeric(1L))
-  expect_true(all(lo <= vs))
-  expect_true(all(hi >= vs))
+  bad <- character(0)
+  for (v in vs) for (up in c(TRUE, FALSE)) {
+    s <- .ra_bound1(v, up)
+    cmp <- .exact_cmp_decimal_double(s, v)
+    target <- if (up) ra_succ(v) else ra_pred(v)
+    wide <- is.finite(target) && {
+      cmp_target <- .exact_cmp_decimal_double(s, target)
+      if (up) cmp_target > 0L else cmp_target < 0L
+    }
+    if ((if (up) cmp < 0L else cmp > 0L) || wide) {
+      bad <- c(bad, sprintf("%.17g up=%s -> %s", v, up, s))
+    }
+  }
+  expect_identical(bad, character(0))
+})
+
+test_that("POSITIVE CONTROL: the exact base-R referent detects a wrong side", {
+  ## The binary64 datum called 0.1 lies strictly above the exact decimal 0.1,
+  ## so that decimal is a false upper endpoint and the referent must reject it.
+  expect_identical(.exact_cmp_decimal_double("0.1", 0.1), -1L)
 })
 
 test_that("numbers that are decimals exactly are printed exactly", {
