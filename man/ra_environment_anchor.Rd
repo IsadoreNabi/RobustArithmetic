@@ -8,10 +8,12 @@ ra_environment_anchor()
 }
 \value{
 A list with two fields: \code{anchor}, the stored description
-  (library version, R version, byte-code compilation level, backend
-  version, generation date and source of the worst-case inputs), and
-  \code{mismatch}, a character vector naming each comparable field that
-  differs, empty when none does.
+  (C library version, R version, byte-code compilation level, platform
+  identifier, backend version, generation date and source of the worst-case
+  inputs),
+  and \code{mismatch}, a character vector naming each comparable field that
+  differs or cannot be identified, empty only when every compared field
+  matches.
 }
 \description{
 Returns what the sentinel table was generated against and the
@@ -19,11 +21,14 @@ Returns what the sentinel table was generated against and the
   failure can be explained rather than merely reported.
 }
 \details{
-The comparison covers what can be read without side effects: the
-  R version and the byte-code compilation level, plus the C library
-  version where the system exposes it. The anchor explains; it does not
-  guard. The guard is the sentinel check itself, which measures the route
-  rather than trusting any version string.
+The comparison covers \code{r_version}, \code{jit_level},
+  \code{libm} and \code{platform}. The platform is the identifier reported
+  by \code{R.version$platform}. An unavailable C library or platform
+  identifier, in either the running environment or the stored anchor, is
+  itself a mismatch: lack of evidence cannot establish that the running
+  environment is the generator. The anchor explains; it does not guard. The
+  guard is the sentinel check itself, which measures the route rather than
+  trusting any version string.
 }
 \section{Methodological notes}{
 
@@ -35,7 +40,7 @@ The comparison covers what can be read without side effects: the
 \section{Dependencies}{
 
   Base R. Reading the C library version uses \code{getconf} where it
-  exists and reports nothing where it does not.
+  exists; a missing or unusable response is reported as a mismatch.
 }
 
 \examples{

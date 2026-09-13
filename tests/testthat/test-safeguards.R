@@ -22,9 +22,12 @@ test_that("the sentinel table is present, complete and self-consistent", {
   i <- s$fun == "sin" & s$role == "route_discrepancy"
   expect_identical(s$x[i], 2.5698953698477605e-08)
   ## at that point the ordinary route returns a double different from the
-  ## correctly rounded one; if this ever stops being true the environment
-  ## changed and the sentinels must be regenerated, not inherited
-  expect_false(identical(sin(s$x[i]), s$cr[i]))
+  ## correctly rounded one in the anchored environment. If it stops being true
+  ## there, the sentinels must be regenerated rather than inherited. The table
+  ## invariants above remain unconditional on every machine.
+  if (!length(ra_environment_anchor()$mismatch)) {
+    expect_false(identical(sin(s$x[i]), s$cr[i]))
+  }
 })
 
 test_that("S1: the sentinels pass on the healthy route", {
@@ -94,7 +97,8 @@ test_that("S2: with the backend present, the first fast use audits the route", {
 
 test_that("S4: the environment anchor is named and the comparison can fail", {
   a <- ra_environment_anchor()
-  expect_true(all(c("libm", "r_version", "jit_level") %in% names(a$anchor)))
+  expect_true(all(c("libm", "r_version", "jit_level", "platform") %in%
+                    names(a$anchor)))
   ## WHETHER the current environment matches is a fact about the machine and
   ## not about this package, so it is not asserted: the sentinels were
   ## generated somewhere, and everywhere else the honest answer is a mismatch.
@@ -113,6 +117,15 @@ test_that("S4: the environment anchor is named and the comparison can fail", {
   mm <- .ra_compare_anchor(fake)
   expect_true(length(mm) >= 1L)
   expect_match(paste(mm, collapse = " "), "0.0", fixed = TRUE)
+})
+
+test_that("S4: an unidentifiable C library is a mismatch", {
+  compare <- .ra_compare_anchor
+  mocked <- new.env(parent = environment(compare))
+  mocked$system2 <- function(...) stop("getconf is unavailable")
+  environment(compare) <- mocked
+  mm <- compare(.ra_anchor)
+  expect_true(any(grepl("libm", mm, fixed = TRUE)))
 })
 
 test_that("S3: provenance is carried, propagated by weakness, and printed", {

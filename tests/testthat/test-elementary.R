@@ -148,16 +148,18 @@ test_that("the evaluation path in use is not the correctly rounded one", {
   ## This is the reason the slack is measured against the path in use instead
   ## of taken from the publication. At this argument the system math library,
   ## called from C, returns the correctly rounded sine; R returns the argument
-  ## itself, one unit in the last place away. The assertion is written against
-  ## the multiprecision value rather than against any internal of R, so it says
-  ## what it means and does not depend on how R was compiled.
+  ## itself, one unit in the last place away in the environment recorded by
+  ## the anchor. The mathematical and containment claims below remain valid in
+  ## every environment; only the machine claim is conditional on a match.
   skip_if_not(ra_has_mpfr(), "the referent needs Rmpfr")
   x <- 2.5698953698477605e-08
   exact <- Rmpfr::mpfr(x, 300L)
-  z <- sin(exact)
+  z <- base::sin(exact)
   correct <- ra_to_double(z, "down")
   expect_identical(correct, ra_to_double(z, "up") - 2^-78)
-  expect_false(identical(sin(x), correct))
+  if (!length(ra_environment_anchor()$mismatch)) {
+    expect_false(identical(sin(x), correct))
+  }
   ## and the enclosure holds both, which is the claim that matters
   enc <- ra_elem("sin", ra_interval(x, x))
   expect_true(ra_inf(enc) <= correct && ra_sup(enc) >= correct)

@@ -133,22 +133,27 @@ ra_check_sentinels <- function(slack = NULL) {
 #'   comparison of the running environment with it, so that a sentinel
 #'   failure can be explained rather than merely reported.
 #' @return A list with two fields: \code{anchor}, the stored description
-#'   (library version, R version, byte-code compilation level, backend
-#'   version, generation date and source of the worst-case inputs), and
-#'   \code{mismatch}, a character vector naming each comparable field that
-#'   differs, empty when none does.
-#' @details The comparison covers what can be read without side effects: the
-#'   R version and the byte-code compilation level, plus the C library
-#'   version where the system exposes it. The anchor explains; it does not
-#'   guard. The guard is the sentinel check itself, which measures the route
-#'   rather than trusting any version string.
+#'   (C library version, R version, byte-code compilation level, platform
+#'   identifier, backend version, generation date and source of the worst-case
+#'   inputs),
+#'   and \code{mismatch}, a character vector naming each comparable field that
+#'   differs or cannot be identified, empty only when every compared field
+#'   matches.
+#' @details The comparison covers \code{r_version}, \code{jit_level},
+#'   \code{libm} and \code{platform}. The platform is the identifier reported
+#'   by \code{R.version$platform}. An unavailable C library or platform
+#'   identifier, in either the running environment or the stored anchor, is
+#'   itself a mismatch: lack of evidence cannot establish that the running
+#'   environment is the generator. The anchor explains; it does not guard. The
+#'   guard is the sentinel check itself, which measures the route rather than
+#'   trusting any version string.
 #' @section Methodological notes:
 #'   A version string equal to the anchor does not prove the route is the
 #'   anchored one, and a different string does not prove it is not; this is
 #'   why the anchor is reported alongside the check instead of replacing it.
 #' @section Dependencies:
 #'   Base R. Reading the C library version uses \code{getconf} where it
-#'   exists and reports nothing where it does not.
+#'   exists; a missing or unusable response is reported as a mismatch.
 #' @references
 #'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
 #'   Accuracy of mathematical functions in single, double, double extended, and
@@ -169,12 +174,12 @@ ra_environment_anchor <- function() {
   out <- character(0)
   rv <- paste(R.version$major, R.version$minor, sep = ".")
   if (!identical(rv, anchor$r_version)) {
-    out <- c(out, paste0("R version is ", rv, " and the sentinels were ",
-                         "generated on ", anchor$r_version))
+    out <- c(out, paste0("r_version is '", rv, "' and the sentinels were ",
+                         "generated on '", anchor$r_version, "'"))
   }
   jit <- compiler::enableJIT(-1L)
   if (!identical(jit, anchor$jit_level)) {
-    out <- c(out, paste0("the byte-code compilation level is ", jit,
+    out <- c(out, paste0("jit_level is ", jit,
                          " and the sentinels were generated at ",
                          anchor$jit_level))
   }
@@ -182,11 +187,35 @@ ra_environment_anchor <- function() {
     suppressWarnings(system2("getconf", "GNU_LIBC_VERSION", stdout = TRUE,
                              stderr = FALSE)[1L]),
     error = function(e) NA_character_)
-  if (!is.na(libm) && is.character(anchor$libm) && !is.na(anchor$libm) &&
-      !identical(libm, anchor$libm)) {
-    out <- c(out, paste0("the C library reports '", libm,
+  libm_known <- is.character(libm) && length(libm) == 1L &&
+    !is.na(libm) && nzchar(libm)
+  anchor_libm_known <- is.character(anchor$libm) &&
+    length(anchor$libm) == 1L && !is.na(anchor$libm) && nzchar(anchor$libm)
+  if (!libm_known) {
+    out <- c(out, "libm could not be identified in the running environment")
+  } else if (!anchor_libm_known) {
+    out <- c(out, "libm could not be identified in the sentinel anchor")
+  } else if (!identical(libm, anchor$libm)) {
+    out <- c(out, paste0("libm reports '", libm,
                          "' and the sentinels were generated against '",
                          anchor$libm, "'"))
+  }
+  platform <- R.version$platform
+  platform_known <- is.character(platform) &&
+    length(platform) == 1L && !is.na(platform) &&
+    nzchar(platform)
+  anchor_platform_known <- is.character(anchor$platform) &&
+    length(anchor$platform) == 1L && !is.na(anchor$platform) &&
+    nzchar(anchor$platform)
+  if (!platform_known) {
+    out <- c(out, paste0("platform could not be identified in the running ",
+                         "environment"))
+  } else if (!anchor_platform_known) {
+    out <- c(out, "platform could not be identified in the sentinel anchor")
+  } else if (!identical(platform, anchor$platform)) {
+    out <- c(out, paste0("platform is '", platform,
+                         "' and the sentinels were generated on '",
+                         anchor$platform, "'"))
   }
   out
 }
