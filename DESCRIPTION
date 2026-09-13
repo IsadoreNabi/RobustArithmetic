@@ -1,7 +1,7 @@
 Package: RobustArithmetic
 Type: Package
 Title: Verified Interval Arithmetic and Rigorous Enclosures in Pure R
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: person(given = "Jose Mauricio",
                   family = "Gomez Julian",
                   role = c("aut", "cre"),

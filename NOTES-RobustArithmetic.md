@@ -1100,3 +1100,263 @@ actualizacion del 21/08 —imprimia todavia `# [4, 6]_com`— y por lo tanto una
 paralelo de las paginas. Se verifico que es **identica al commit `353ca5e`** de la wiki antes de
 borrarla: el contenido esta preservado en el historial y no se perdio nada. Las copias canonicas
 son el repositorio de la wiki y `LIBRERIAS EN R/Robust Arithmetic/Wiki/`.
+
+---
+
+## §8. La lectura decimal de R no certifica de que lado cae un extremo
+
+Las verificaciones de CRAN del 12/09/2026 encontraron el mismo defecto en tres
+configuraciones sin doble largo de ochenta bits: `r-oldrel-macos-arm64`, `M1mac` y `noLD`.
+El bloque de `test-decimal.R` que debia correr sin Rmpfr fallo porque el extremo inferior
+impreso, vuelto a leer con `as.numeric()`, podia quedar por encima del double que pretendia
+acotar. La prueba exponia un defecto real del motor: en esas configuraciones tambien podia
+imprimirse un intervalo que no contenia al intervalo del objeto.
+
+### §8.1. La causa y la premisa falsa de §6.3
+
+La conversion que hace R de una cadena decimal no es un redondeo correctamente dirigido ni
+un referente exacto. En R 4.6.1, `R_strtod5()` acumula el significando con
+`ans = 10*ans + d` y aplica la potencia de diez mediante productos sucesivos, todo en
+`LDOUBLE`. En arm64 de macOS y en una compilacion con `--disable-long-double`, `LDOUBLE` es
+el mismo doble binario de 53 bits; cada acumulacion y cada producto puede redondear. Con
+doble largo de ochenta bits el error es menor, pero tampoco hay una garantia de redondeo
+correcto que permita deducir el lado del decimal exacto.
+
+Por eso era falsa la frase de §6.3 segun la cual la conversion era monotona «porque es un
+redondeo». Que el valor binario producido por el lector caiga por encima de un extremo no
+prueba que el decimal matematico este por encima. El barrido adversarial del codigo anterior,
+que desplaza 64 dobles toda lectura no exacta, encontro sobre 282 valores 126 fallos de
+contencion en el modo ascendente y 129 en el descendente; encontro ademas 278 fallos de
+holgura y 3 errores en cada modo. En la compilacion real sin doble largo, la medicion de
+partida registrada por el encargo daba cuatro fallos en `test-decimal.R`.
+
+### §8.2. La certificacion que la sustituye
+
+`.ra_safe()` ya no consulta `.ra_value()`. La igualdad se decide por pertenencia exacta a la
+rejilla decimal; fuera de ella, `.ra_cmp_dec()` solo devuelve un lado cuando el significando
+decimal exacto y la cota derivada del escalamiento lo certifican. `.ra_bound1()` aplica la
+misma comparacion al doble adyacente antes de aceptar la holgura, amplía la busqueda hasta
+dieciocho cifras cuando hace falta y se detiene con un defecto interno si no puede probar a
+la vez contencion y estrechez. La ruta que identifica un dato, `.ra_exact1()`, no cambia:
+ahi el valor producido por el lector de R es precisamente la identidad que se quiere
+reproducir.
+
+Los significandos de hasta diecinueve cifras se forman sin leerlos de una vez. Se leen por
+separado las primeras quince cifras y las cuatro restantes, que son enteros exactos en todo
+doble binario; despues se recupera por resta decimal exacta el residuo de la combinacion
+aritmetica. Asi, toda lectura de cadena que participa en la prueba de una cota es la de un
+entero sin punto ni exponente de a lo sumo quince cifras.
+
+El porton que corre en CRAN tambien dejo de volver a leer la cota con `as.numeric()`. Su
+referente de R base toma el `%a` hexadecimal exacto del double, lo convierte a un entero por
+una potencia de dos y, cuando el exponente es negativo, a un entero por una potencia de cinco
+acompañado de una potencia de diez. Los enteros se llevan en miembros de base `10^7`, con
+productos cuyas entradas quedan por debajo de `2^53`, y la comparacion final es cifra por
+cifra. El referente comprueba tanto contencion como holgura de un paso y tiene un control
+positivo: reconoce que el decimal exacto `0.1` queda por debajo del double de R llamado
+`0.1`, por lo que aquel seria un extremo superior falso.
+
+### §8.3. Lo medido despues de la reparacion
+
+En el R del sistema, todos los portones de `test-decimal.R`, incluidos los de Rmpfr a 400
+bits, terminaron con **0 fallos y 0 errores**. En el R 4.6.1 compilado sin doble largo, la
+misma corrida con Rmpfr y la corrida que reproduce CRAN sin Rmpfr terminaron ambas con
+**0 fallos y 0 errores**. El lector adversarial de 64 dobles termino, en los dos sentidos,
+con **0 fallos de contencion, 0 fallos de holgura y 0 errores**. Como comprobacion separada
+del instrumento nuevo, su reconstruccion decimal del double y el signo de sus comparaciones
+coincidieron con Rmpfr en **442 valores**, sin una discrepancia.
+
+### §8.4. El costo
+
+Se calento primero el camino de impresion y se midieron cinco corridas de `format()` sobre
+los mismos mil intervalos aleatorios, con semilla `20260913`, en esta maquina. Antes del
+cambio los tiempos fueron 1,206, 1,147, 1,171, 1,157 y 1,251 segundos, con mediana de
+**1,171 s**; despues fueron 1,774, 1,833, 1,852, 1,653 y 1,805 segundos, con mediana de
+**1,805 s**. El costo observado subio un 54 %, porque ahora cada candidato que decide un
+lado lleva una prueba en lugar de una lectura aproximada. La pagina de `ra_show` se actualizo
+con la mediana, la semilla, el calentamiento, las cinco repeticiones, la cantidad de extremos
+distintos y el procesador; su declaracion general sigue siendo del orden de un milisegundo
+por extremo distinto y de segundos para miles de intervalos.
+
+---
+
+## §9. El ancla distingue el entorno generador antes de afirmar una discrepancia de ruta
+
+Las verificaciones de CRAN en `r-oldrel-macos-arm64` y `r-oldrel-macos-x86_64`, con R 4.5.2
+sobre macOS Ventura, encontraron dos afirmaciones que seguían describiendo la máquina donde se
+generaron los centinelas. En el punto `2.5698953698477605e-08`, la ruta ordinaria de `sin` en
+esas máquinas devuelve el valor correctamente redondeado, mientras que las pruebas exigían que
+fuera distinto. La tabla, su par encuadrante y la contención eran correctos; el defecto estaba
+en haber convertido una observación del entorno generador en una propiedad incondicional del
+paquete.
+
+### §9.1. El segundo defecto estaba en la identificación del entorno
+
+`.ra_compare_anchor()` comparaba la biblioteca de C sólo cuando `getconf GNU_LIBC_VERSION`
+respondía. Si el ejecutable no podía identificarla, como ocurre fuera de sistemas con glibc,
+la comparación no agregaba ninguna discrepancia. El ancla tampoco registraba el identificador
+de plataforma. Por eso un R de la misma versión sobre macOS arm64 podía producir un vector de
+discrepancias vacío aunque no hubiera evidencia de que su ruta matemática fuera la del
+generador: la ausencia de identificación se estaba leyendo como coincidencia.
+
+La medición de partida consignada en el encargo reprodujo el defecto en cinco escenarios. El
+entorno local dio 0 fallos; `oldrel`, 3; `release_nolibm`, 3 con 0 campos discrepantes;
+`other_arch`, 3 también con 0 campos discrepantes; y el control positivo `guard`, 3. El
+resultado agregado fue `ORACLE_ENV FAIL`.
+
+### §9.2. La reparación separa la matemática de la afirmación de máquina
+
+El dato regenerado agrega `platform = R.version$platform`, cuyo valor en el entorno generador
+es `x86_64-redhat-linux-gnu`. La comparación nombra de manera literal los campos `r_version`,
+`jit_level`, `libm` y `platform`; una biblioteca de C o un identificador de plataforma que no
+pueda identificarse, tanto en el proceso como en el ancla, cuenta como discrepancia. Esta regla
+conserva el papel explicativo del ancla: el control efectivo de la ruta sigue siendo la tabla de
+centinelas y no una cadena de versión.
+
+En `test-elementary.R` y `test-safeguards.R` sólo se condicionaron las dos afirmaciones de que
+la ruta ordinaria difiere del valor correctamente redondeado. El valor multiprecisión, la
+adyacencia del par de dobles, la identidad del punto, la integridad de la tabla y la contención
+del encierro siguen siendo incondicionales. La referencia multiprecisión llama a `base::sin()`
+para permanecer separada de la sustitución con la que el oráculo emula la ruta ordinaria. Un
+control negativo adicional hace fallar `getconf` y exige que la respuesta nombre `libm`; de
+este modo, volver a interpretar una biblioteca no identificable como coincidencia rompe la
+suite.
+
+`dev/gen_sentinels.R` regeneró `R/sysdata.rda`, y la tabla medida permaneció idéntica: 19 filas,
+7 columnas y huella MD5 `6a7b920afcf878efb52a2b6d68220610`. La documentación de
+`ra_environment_anchor()` enumera los cuatro campos comparados y declara que lo no identificable
+es una discrepancia; la regeneración de Roxygen modificó solamente
+`man/ra_environment_anchor.Rd`.
+
+### §9.3. Lo medido después de la reparación
+
+El oráculo de entornos terminó con 0 fallos en `home`, `oldrel`, `release_nolibm` y
+`other_arch`. Los tres escenarios no locales registraron una discrepancia cada uno. El control
+positivo conservó el ancla coincidente, sustituyó la ruta por una correctamente redondeada y
+produjo 2 fallos, de modo que las dos afirmaciones de máquina siguen mordiendo donde tienen
+razón de ser; el resultado agregado fue `ORACLE_ENV PASS`.
+
+Los dos archivos de prueba tocados terminaron con `TOUCHED FAILED 0 ERRORS 0`. La suite completa
+que reproduce CRAN en R 4.6.1 sin doble largo y sin Rmpfr confirmó `long.double FALSE` y terminó
+con `SUITE FAILED 0 ERRORS 0`. El dato regenerado respondió `ANCHOR_ARCH TRUE`. No se cambiaron
+la tabla de centinelas, las holguras, el nivel rápido ni la degradación.
+
+---
+
+## §10. La procedencia del veredicto sale de las evaluaciones que lo sostienen
+
+La tarjeta de `ra_solve()` degradaba todos los veredictos cuando Rmpfr no estaba disponible.
+`.ra_finish_paving()` iniciaba `verified` con la mera presencia del paquete y, al ensamblar el
+resultado, reemplazaba la procedencia de cada certificado por `measured` si el paquete faltaba.
+La premisa era falsa: en el nivel rápido, `+`, `-`, `*`, `/` y las potencias enteras ya producen
+encierros cuya procedencia es `theorem`; son las funciones elementales las que producen
+`measured`, porque dependen de la holgura medida de la biblioteca matemática.
+
+La reparación conserva en cada caja la procedencia de la evaluación que permite excluirla o
+mantenerla, y conserva el más débil al partir, inflar o fusionar cajas. El pase con Rmpfr no
+cambió: vuelve a establecer rigurosamente cada certificado de unicidad y cada exclusión, y sólo
+entonces les asigna `theorem`. Sin ese pase, el campo `verified` se deriva de la procedencia que
+llevan los veredictos ensamblados; por eso vale `TRUE` cuando todos son teorema y `FALSE` cuando
+alguno depende de una evaluación medida. La tarjeta declara la procedencia más débil del
+empedrado, el resumen formula la misma condición y `as.data.frame()` deja de imponer
+`measured` a toda abstención.
+
+Antes de la reparación, el oráculo de procedencia sin Rmpfr terminó en `ORACLE_PROV FAIL`: los
+casos `poly`, `cubic` y `rational` salieron `prov=measured` y `verified=FALSE`, mientras `sin` y
+`mixed` conservaron correctamente esa procedencia medida. En el R del sistema con Rmpfr, los
+cinco casos terminaron en `ORACLE_PROV PASS`, todos con `prov=theorem` y `verified=TRUE`.
+
+Después de la reparación, el mismo oráculo sin Rmpfr terminó en `ORACLE_PROV PASS`: `poly`,
+`cubic` y `rational` salieron `prov=theorem` y `verified=TRUE`, y `sin` y `mixed` permanecieron
+`prov=measured` y `verified=FALSE`. Con Rmpfr, los cinco casos volvieron a terminar en
+`ORACLE_PROV PASS`, todos como teorema. Las pruebas del resolvedor y sus portones terminaron con
+`NEWTON FAILED 0 ERRORS 0`; la suite completa que reproduce CRAN en R 4.6.1 sin doble largo y
+sin Rmpfr confirmó `long.double FALSE` y terminó con `SUITE FAILED 0 ERRORS 0`.
+
+---
+
+## §11. La preparación del reenvío 0.1.1 y sus verificaciones finales
+
+La versión de `DESCRIPTION` pasó de 0.1.0 a **0.1.1** sin modificar ningún otro campo. `NEWS.md`
+contiene una entrada por cada reparación aceptada en §8, §9 y §10 y declara sus consecuencias
+visibles: la detención de `format()` cuando una cota no puede probarse, el costo medido de la
+certificación decimal, el mensaje que aparece al adjuntar el paquete con `library()` o `require()`
+en los sistemas cuyo `getconf` no identifica la biblioteca de C, el campo nuevo `platform` y las
+etiquetas nuevas de la tarjeta y el resumen de `ra_solve()`. Los comentarios para CRAN identifican
+el archivo fuente 0.1.1, declaran los entornos de prueba y responden por separado a
+`r-oldrel-macos-arm64`, `r-oldrel-macos-x86_64`, `M1mac` y `noLD`.
+
+### §11.1. Los tres chequeos naturales dentro del recinto
+
+Los tres chequeos construyeron de manera independiente el archivo fuente 0.1.1 y ejecutaron
+`R CMD check --as-cran`. Los registros identifican Fedora Linux 44 y R 4.6.1 en todos los casos;
+la compilación del sistema usa la plataforma `x86_64-redhat-linux-gnu`, mientras que la compilación
+sin doble largo usa `x86_64-pc-linux-gnu`.
+
+| configuración | paquetes sugeridos | resultado |
+| --- | --- | --- |
+| R del sistema | obligatorios y disponibles | `Status: OK` |
+| R sin doble largo, con Rmpfr en su biblioteca auxiliar | obligatorios y disponibles | `Status: OK` |
+| R sin doble largo, sin Rmpfr | no obligatorios | `Status: OK` |
+
+En el primer intento, los tres registros habían terminado con `Status: 1 NOTE` porque el recinto
+no podía consultar por red una hora externa. La adjudicación enmendó únicamente esa causa mediante
+`_R_CHECK_SYSTEM_CLOCK_=false`: la comparación remota del reloj quedó apagada, mientras que la
+instalación, los ejemplos, las pruebas, la reconstrucción de las viñetas y las versiones PDF y HTML
+del manual se ejecutaron y quedaron en estado `OK` en los tres registros. No se rebajó el resultado
+exigido ni se aceptó la nota como si fuera éxito.
+
+### §11.2. La repetición fuera del recinto y con red
+
+La adjudicación repitió los tres chequeos sobre el mismo árbol, con una construcción independiente
+para cada uno, acceso a red y sin definir `_R_CHECK_SYSTEM_CLOCK_`. Las comprobaciones remotas de
+entrada permanecieron apagadas para conservar la misma matriz; la verificación remota del reloj sí
+se ejecutó. Los tres resultados volvieron a ser `Status: OK`.
+
+| configuración | comprobaciones remotas de entrada | resultado | segundos |
+| --- | --- | --- | ---: |
+| R del sistema, sugeridos obligatorios | apagadas | `Status: OK` | 48 |
+| R sin doble largo, con Rmpfr | apagadas | `Status: OK` | 40 |
+| R sin doble largo, sin Rmpfr y con sugeridos no obligatorios | apagadas | `Status: OK` | 36 |
+| R del sistema, sugeridos obligatorios | encendidas | `Status: 1 NOTE` | 59 |
+
+El cuarto chequeo encendió también las comprobaciones remotas de entrada. Su única nota fue la de
+factibilidad de CRAN: `Days since last update: 1`. El intervalo de un día se explica porque 0.1.1
+corrige las fallas que las verificaciones de CRAN informaron el 2026-09-12; no apareció ninguna
+nota sobre el contenido, la instalación, las pruebas, las viñetas ni los manuales del paquete.
+
+### §11.3. La suite, el archivo fuente y el límite de esta unidad
+
+La suite completa con todos los portones se ejecutó en el R del sistema, con `NOT_CRAN=true`, y
+terminó con `SUITE_ALLGATES FAILED 0 ERRORS 0`. La corrección posterior modifica solamente
+`NEWS.md`, `cran-comments.md` y esta sección: el primero entra en el archivo fuente, pero ninguno
+es leído por la suite. Por eso los tres chequeos naturales se repiten sobre el texto final y la
+suite no se vuelve a correr; un control separado comprueba que ningún archivo leído por ella o por
+la construcción, salvo `NEWS.md`, haya cambiado desde la adjudicación.
+
+El control de metadatos devuelve `VERSION_OK` y confirma el encabezado
+`# RobustArithmetic 0.1.1`. El archivo fuente construido contiene una copia de `NEWS.md` y ningún
+directorio `_problems`, archivo `testthat-problems` ni resto `.Rcheck`; el resultado literal es
+`NEWS_IN 1 DEBRIS 0`. El control de los comentarios encuentra las cuatro configuraciones y devuelve
+`FLAVORS 4`.
+
+### §11.4. La exactitud de los dos textos publicables
+
+La descripción del motor decimal distingue ahora sus dos piezas. El motor decide el lado mediante
+el significando decimal exacto y una cota de error derivada del escalado, y declina cuando esa cota
+no certifica el resultado; la aritmética entera exacta pertenece al referente independiente de las
+pruebas, que reconstruye el doble binario desde su representación hexadecimal. `NEWS.md` registra
+además que la mediana de mil intervalos pasó de 1,171 a 1,805 segundos, un 54 %, y que `format()` se
+detiene con un error si no puede probar contención y estrechez de un paso.
+
+El texto del ancla atribuye a las pruebas, y no a las salvaguardas, las afirmaciones condicionadas
+sobre la ruta de `sin()`. También declara que `ra_environment_anchor()` devuelve `platform` y que,
+en macOS y Windows, donde `getconf` no identifica la biblioteca de C, el mensaje de ancla distinta
+aparece al adjuntar el paquete con `library()` o `require()`. La salida de `ra_solve()` queda
+nombrada con sus rótulos literales: `verdict provenance` en la tarjeta y
+`Theorem provenance for every verdict` en el resumen.
+
+No se modificaron el código, las pruebas, la documentación de funciones, los datos, el espacio de
+nombres, la licencia ni ningún campo restante de `DESCRIPTION`. Esta unidad tampoco ejecutó
+operaciones de git ni envió o publicó el paquete; deja en disco el archivo fuente y los tres
+registros para su comprobación antes del reenvío.
