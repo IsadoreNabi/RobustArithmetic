@@ -41,7 +41,8 @@ bits; it climbs the declared ladder when a verification cannot decide.}
 An object of class \code{ra_paving}: a list with the certified
   roots (\code{unique}), the abstentions (\code{not_excludable}), the
   excluded cover (\code{excluded}), the budget spent, and the provenance
-  of the verdicts. Its \code{print()} is the card.
+  of the verdicts. The logical field \code{verified} is true exactly when
+  every verdict has theorem provenance. Its \code{print()} is the card.
 }
 \description{
 Paves the window, drives the interval Newton operator over
@@ -50,14 +51,17 @@ Paves the window, drives the interval Newton operator over
   over everything excluded; or \code{not excludable}, the abstention.
 }
 \details{
-The search runs at the fast level. No card word leaves it: when
-  the multiprecision backend is present, every uniqueness certificate is
-  re-established at the rigorous level, where the enclosure is a theorem,
-  and every excluded box is re-excluded there; a verification that cannot
-  decide climbs the precision ladder and, at the top, moves its box to the
-  abstention with the budget in the message. When the backend is absent
-  the verdicts keep the measured provenance of the fast level and the card
-  labels them so.
+The search runs at the fast level and carries the provenance of
+  the evaluations that support each verdict. The arithmetic operators and
+  integer powers have theorem provenance at that level; elementary
+  functions have measured provenance. When the multiprecision backend is
+  present, every uniqueness certificate is re-established at the rigorous
+  level, where the enclosure is a theorem, and every excluded box is
+  re-excluded there; a verification that cannot decide climbs the precision
+  ladder and, at the top, moves its box to the abstention with the budget in
+  the message. Without the backend there is no blanket downgrade: each
+  verdict keeps the provenance of its fast evaluations, and the card labels
+  the weakest provenance carried by the paving.
 
   The certificate behind \code{unique} is the Hansen-Sengupta one: a
   Newton image strictly interior to its box with a derivative enclosure
@@ -82,8 +86,9 @@ The search runs at the fast level. No card word leaves it: when
 \section{Dependencies}{
 
   Base R at the fast level. The rigorous verification requires 'Rmpfr',
-  which is in \code{Suggests}; without it the verdicts are labeled with
-  their measured provenance.
+  which is in \code{Suggests}; without it arithmetic-only verdicts retain
+  theorem provenance and verdicts using elementary functions retain
+  measured provenance.
 }
 
 \examples{

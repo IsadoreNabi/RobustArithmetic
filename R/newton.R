@@ -140,6 +140,10 @@ ra_newton_step <- function(e, x, var = "x", env = list(),
     n_proc <- n_proc + 1L
 
     fX <- enc(e, X)
+    ## The box becomes a verdict only through this evaluation. Carry its
+    ## provenance on the box itself so exclusions and abstentions do not
+    ## inherit the stronger provenance of their endpoint constructor.
+    X$prov <- ra_prov(fX)
     if (!contains0(fX)) {
       excluded[[length(excluded) + 1L]] <- X
       next
@@ -168,8 +172,12 @@ ra_newton_step <- function(e, x, var = "x", env = list(),
         queue[[length(queue) + 1L]] <- Z
       } else {
         s <- ra_inf(Z) + (2 / 3) * ra_wid(Z)
-        queue[[length(queue) + 1L]] <- ra_interval(ra_inf(Z), s)
-        queue[[length(queue) + 1L]] <- ra_interval(s, ra_sup(Z))
+        left <- ra_interval(ra_inf(Z), s)
+        right <- ra_interval(s, ra_sup(Z))
+        left$prov <- ra_prov(Z)
+        right$prov <- ra_prov(Z)
+        queue[[length(queue) + 1L]] <- left
+        queue[[length(queue) + 1L]] <- right
       }
     }
   }
@@ -225,10 +233,12 @@ ra_newton_step <- function(e, x, var = "x", env = list(),
                                  precision) {
   Y <- B
   for (round in 1:3) {
+    prov <- ra_prov(Y)
     mid <- ra_mid(Y)
     rad <- ra_wid(Y) / 2
     Y <- ra_interval(ra_pred(mid - 1.1 * rad - min_width),
                      ra_succ(mid + 1.1 * rad + min_width))
+    Y$prov <- prov
     N <- ra_newton_step(e, Y, var = var, env = env)
     if (isTRUE(attr(N, "ra_dspan"))) return(NULL)
     if (length(N) == 1L &&
@@ -249,8 +259,10 @@ ra_newton_step <- function(e, x, var = "x", env = list(),
   for (B in boxes[-1L]) {
     L <- out[[length(out)]]
     if (ra_inf(B) <= ra_sup(L) + gap) {
-      out[[length(out)]] <- ra_interval(min(ra_inf(L), ra_inf(B)),
-                                        max(ra_sup(L), ra_sup(B)))
+      merged <- ra_interval(min(ra_inf(L), ra_inf(B)),
+                            max(ra_sup(L), ra_sup(B)))
+      merged$prov <- .ra_prov2(ra_prov(L), ra_prov(B))
+      out[[length(out)]] <- merged
     } else {
       out[[length(out) + 1L]] <- B
     }
@@ -285,15 +297,19 @@ ra_newton_step <- function(e, x, var = "x", env = list(),
 #' @return An object of class \code{ra_paving}: a list with the certified
 #'   roots (\code{unique}), the abstentions (\code{not_excludable}), the
 #'   excluded cover (\code{excluded}), the budget spent, and the provenance
-#'   of the verdicts. Its \code{print()} is the card.
-#' @details The search runs at the fast level. No card word leaves it: when
-#'   the multiprecision backend is present, every uniqueness certificate is
-#'   re-established at the rigorous level, where the enclosure is a theorem,
-#'   and every excluded box is re-excluded there; a verification that cannot
-#'   decide climbs the precision ladder and, at the top, moves its box to the
-#'   abstention with the budget in the message. When the backend is absent
-#'   the verdicts keep the measured provenance of the fast level and the card
-#'   labels them so.
+#'   of the verdicts. The logical field \code{verified} is true exactly when
+#'   every verdict has theorem provenance. Its \code{print()} is the card.
+#' @details The search runs at the fast level and carries the provenance of
+#'   the evaluations that support each verdict. The arithmetic operators and
+#'   integer powers have theorem provenance at that level; elementary
+#'   functions have measured provenance. When the multiprecision backend is
+#'   present, every uniqueness certificate is re-established at the rigorous
+#'   level, where the enclosure is a theorem, and every excluded box is
+#'   re-excluded there; a verification that cannot decide climbs the precision
+#'   ladder and, at the top, moves its box to the abstention with the budget in
+#'   the message. Without the backend there is no blanket downgrade: each
+#'   verdict keeps the provenance of its fast evaluations, and the card labels
+#'   the weakest provenance carried by the paving.
 #'
 #'   The certificate behind \code{unique} is the Hansen-Sengupta one: a
 #'   Newton image strictly interior to its box with a derivative enclosure
@@ -313,8 +329,9 @@ ra_newton_step <- function(e, x, var = "x", env = list(),
 #'   larger part, which is the finer cut of the reference algorithm.
 #' @section Dependencies:
 #'   Base R at the fast level. The rigorous verification requires 'Rmpfr',
-#'   which is in \code{Suggests}; without it the verdicts are labeled with
-#'   their measured provenance.
+#'   which is in \code{Suggests}; without it arithmetic-only verdicts retain
+#'   theorem provenance and verdicts using elementary functions retain
+#'   measured provenance.
 #' @references
 #'   Hansen, E., & Walster, G. W. (2004). Global optimization using interval
 #'   analysis (2nd ed.). Marcel Dekker.
@@ -343,9 +360,9 @@ ra_solve <- function(e, over, var = "x", env = list(), min_width = NULL,
 ## This is where the ruling on the two levels becomes structure: no word of
 ## the card leaves the fast level when there is a rigorous level to hold it.
 .ra_finish_paving <- function(res, precision) {
-  verified <- ra_has_mpfr()
+  has_mpfr <- ra_has_mpfr()
   budget_note <- character(0)
-  if (verified) {
+  if (has_mpfr) {
     enc_r <- function(expr, X, p) {
       ra_enclose_expr(expr, X, var = res$var, env = res$env,
                       level = "rigorous", precision = p)
@@ -423,11 +440,16 @@ ra_solve <- function(e, over, var = "x", env = list(), min_width = NULL,
       res$excluded <- res$excluded[which(still)]
     }
   }
-  prov <- if (verified) "theorem" else "measured"
-  if (length(res$unique) > 0L) {
-    res$unique$prov <- rep(prov, length(res$unique))
+  if (has_mpfr && length(res$unique) > 0L) {
+    res$unique$prov <- rep("theorem", length(res$unique))
   }
-  res$verified <- verified
+  if (has_mpfr && length(res$excluded) > 0L) {
+    res$excluded$prov <- rep("theorem", length(res$excluded))
+  }
+  verdict_prov <- c(ra_prov(res$unique), ra_prov(res$not_excludable),
+                    ra_prov(res$excluded))
+  res$verified <- length(verdict_prov) > 0L &&
+    all(verdict_prov == "theorem")
   res$budget_note <- budget_note
   structure(res, class = "ra_paving")
 }
@@ -442,12 +464,14 @@ ra_solve <- function(e, over, var = "x", env = list(), min_width = NULL,
 #'   \code{format()} a character vector; \code{as.data.frame()} a data frame
 #'   with one row per verdict and columns \code{lo}, \code{hi},
 #'   \code{verdict} and \code{prov}; \code{summary()} an object of class
-#'   \code{ra_paving_summary} with its own \code{print()}.
-#' @details The card never prints a verdict without its provenance: verdicts
-#'   re-verified at the rigorous level say theorem, and verdicts that could
-#'   not be (because the backend is absent) say measured, loudly. Absence
-#'   over the remainder of the window is only claimed when the paving
-#'   completed within its budget.
+#'   \code{ra_paving_summary} with its own \code{print()}; both report whether
+#'   every verdict has theorem provenance.
+#' @details The card never prints a paving without its weakest provenance.
+#'   A verdict says theorem either when its fast evaluation used only the
+#'   theorem-level arithmetic or when it was re-verified at the rigorous
+#'   level. A verdict that still relies on a measured fast-level evaluation
+#'   says measured, loudly. Absence over the remainder of the window is only
+#'   claimed when the paving completed within its budget.
 #' @section Methodological notes:
 #'   These methods are written together with the class rather than added
 #'   later, because a class whose vector behaviour arrives in a second pass
@@ -468,14 +492,13 @@ NULL
 #' @export
 format.ra_paving <- function(x, ...) {
   prov_word <- if (x$verified) "theorem" else {
-    "measured -- package 'Rmpfr' absent, verdicts NOT re-verified rigorously"
+    "measured -- one or more verdicts NOT re-verified rigorously"
   }
   out <- c(
     paste0("<ra_paving> roots of ", deparse(x$e), " over ",
            format(x$window)),
-    paste0("  unique roots: ", length(x$unique),
-           if (length(x$unique)) paste0("  (provenance: ", prov_word, ")")
-           else ""))
+    paste0("  verdict provenance: ", prov_word),
+    paste0("  unique roots: ", length(x$unique)))
   if (length(x$unique)) {
     out <- c(out, paste0("    ", format(x$unique), "  unique"))
   }
@@ -487,7 +510,7 @@ format.ra_paving <- function(x, ...) {
   if (!x$exhausted) {
     out <- c(out, paste0("  absence demonstrated over the rest of the ",
                          "window (", length(x$excluded), " excluded boxes",
-                         if (x$verified) ", re-verified rigorously" else
+                         if (x$verified) ", theorem provenance" else
                            ", measured provenance", ")"))
     out <- c(out, paste0("  budget: ", x$boxes_processed, " of ",
                          x$max_boxes, " boxes"))
@@ -517,7 +540,7 @@ as.data.frame.ra_paving <- function(x, row.names = NULL, optional = FALSE,
     lo = c(x$unique$lo, x$not_excludable$lo),
     hi = c(x$unique$hi, x$not_excludable$hi),
     verdict = c(rep("unique", n_u), rep("not excludable", n_n)),
-    prov = c(ra_prov(x$unique), rep("measured", n_n)),
+    prov = c(ra_prov(x$unique), ra_prov(x$not_excludable)),
     row.names = row.names, stringsAsFactors = FALSE)
 }
 
@@ -541,7 +564,8 @@ print.ra_paving_summary <- function(x, ...) {
   cat("Excluded boxes: ", x$n_excluded, "  Boxes processed: ", x$boxes,
       "\n", sep = "")
   cat("Budget exhausted: ", if (x$exhausted) "yes" else "no",
-      "  Rigorously verified: ", if (x$verified) "yes" else "no", "\n",
+      "  Theorem provenance for every verdict: ",
+      if (x$verified) "yes" else "no", "\n",
       sep = "")
   invisible(x)
 }

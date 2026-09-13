@@ -96,19 +96,47 @@ test_that("two roots closer than the resolution produce abstention, not a lie", 
   expect_true(length(res$not_excludable) >= 1L)
 })
 
-test_that("the verdict carries its provenance and the card labels it", {
+test_that("arithmetic verdicts retain theorem provenance", {
   res <- ra_solve(quote(r * x - x^2), ra_interval(-3, 3), env = list(r = 0.5))
-  if (ra_has_mpfr()) {
-    ## the ruling of C-54, option (c): no card word ever leaves the fast
-    ## level; with the backend present every printed verdict is re-verified
-    ## rigorously and its provenance is the theorem
-    expect_true(res$verified)
-    expect_true(all(ra_prov(res$unique) == "theorem"))
-  } else {
-    expect_false(res$verified)
-    out <- paste(capture.output(print(res)), collapse = "\n")
-    expect_match(out, "measured")
-  }
+  expect_true(res$verified)
+  expect_true(all(ra_prov(res$unique) == "theorem"))
+  out <- paste(capture.output(print(res)), collapse = "\n")
+  expect_match(out, "verdict provenance: theorem", fixed = TRUE)
+})
+
+test_that("fast verdict provenance follows the operations actually evaluated", {
+  local_mocked_bindings(ra_has_mpfr = function() FALSE,
+                        .package = "RobustArithmetic")
+
+  arithmetic <- ra_solve(quote(x^2 - 2), ra_interval(0, 3))
+  elementary <- ra_solve(quote(sin(x) - 0.5), ra_interval(0, 1))
+  arithmetic_absence <- ra_solve(quote(-1 - x^2), ra_interval(-3, 3))
+  elementary_absence <- ra_solve(quote(-1 - exp(x)), ra_interval(-3, 3))
+  arithmetic_abstention <- ra_solve(quote(-x^2), ra_interval(-1, 1))
+
+  expect_true(arithmetic$verified)
+  expect_identical(unique(as.data.frame(arithmetic)$prov), "theorem")
+  expect_false(elementary$verified)
+  expect_identical(unique(as.data.frame(elementary)$prov), "measured")
+
+  expect_true(arithmetic_absence$verified)
+  expect_false(elementary_absence$verified)
+  expect_true(arithmetic_abstention$verified)
+  expect_identical(unique(as.data.frame(arithmetic_abstention)$prov), "theorem")
+
+  arithmetic_card <- paste(format(arithmetic_absence), collapse = "\n")
+  elementary_card <- paste(format(elementary_absence), collapse = "\n")
+  arithmetic_summary <- paste(capture.output(print(summary(arithmetic))),
+                              collapse = "\n")
+  elementary_summary <- paste(capture.output(print(summary(elementary))),
+                              collapse = "\n")
+  expect_match(arithmetic_card, "verdict provenance: theorem", fixed = TRUE)
+  expect_match(elementary_card, "verdict provenance: measured", fixed = TRUE)
+  expect_match(elementary_card, "NOT re-verified rigorously", fixed = TRUE)
+  expect_match(arithmetic_summary,
+               "Theorem provenance for every verdict: yes", fixed = TRUE)
+  expect_match(elementary_summary,
+               "Theorem provenance for every verdict: no", fixed = TRUE)
 })
 
 test_that("everything the class carries is written together", {

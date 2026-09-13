@@ -29,7 +29,8 @@
   \code{format()} a character vector; \code{as.data.frame()} a data frame
   with one row per verdict and columns \code{lo}, \code{hi},
   \code{verdict} and \code{prov}; \code{summary()} an object of class
-  \code{ra_paving_summary} with its own \code{print()}.
+  \code{ra_paving_summary} with its own \code{print()}; both report whether
+  every verdict has theorem provenance.
 }
 \description{
 The card of a paving: its window, its certified roots with
@@ -37,11 +38,12 @@ The card of a paving: its window, its certified roots with
   and the budget spent -- each verdict a word, never a silence.
 }
 \details{
-The card never prints a verdict without its provenance: verdicts
-  re-verified at the rigorous level say theorem, and verdicts that could
-  not be (because the backend is absent) say measured, loudly. Absence
-  over the remainder of the window is only claimed when the paving
-  completed within its budget.
+The card never prints a paving without its weakest provenance.
+  A verdict says theorem either when its fast evaluation used only the
+  theorem-level arithmetic or when it was re-verified at the rigorous
+  level. A verdict that still relies on a measured fast-level evaluation
+  says measured, loudly. Absence over the remainder of the window is only
+  claimed when the paving completed within its budget.
 }
 \section{Methodological notes}{
 
