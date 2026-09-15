@@ -1,0 +1,174 @@
+# R-hub's generic GitHub Actions workflow file. It's canonical location is at
+# https://github.com/r-hub/actions/blob/v1/workflows/rhub.yaml
+# You can update this file to a newer version using the rhub2 package:
+#
+# rhub::rhub_setup()
+#
+# It is unlikely that you need to modify this file manually.
+#
+# Local additions: the default platform list is the sixteen platforms of the
+# resubmission matrix; and after each check, both jobs run the oracles in
+# dev/platform/ (correct rounding against Rmpfr on the same machine, and a silent,
+# healthy installation) on the package installed by the check, write identity.txt
+# with the commit and the package version, copy the check log, and upload the four
+# files as the oracle artifact (the check directory itself is uploaded separately
+# by run-check as the -results artifact).
+
+name: R-hub
+run-name: >-
+  ${{ github.event.inputs.id || format('Manual run by @{0}', github.triggering_actor) }}:
+  ${{ github.event.inputs.name || github.event.inputs.config }}
+
+on:
+  # A workflow_dispatch trigger only works once the file exists on the default
+  # branch; the resubmission verification runs on its working branch, where the
+  # push event carries no inputs and the sixteen platforms below are used.
+  push:
+    branches:
+      - cran-0.2.0-verify
+  workflow_dispatch:
+    inputs:
+      config:
+        description: >-
+          Comma-separated list of R-hub platforms to use.
+          Full list: https://r-hub.github.io/containers/
+        type: string
+        default: 'windows,macos,macos-arm64,m1-san,clang-asan,clang-ubsan,gcc-asan,valgrind,rchk,nold,nosuggests,intel,lto,c23,ubuntu-next,ubuntu-release'
+      name:
+        description: 'Run name. You can leave this empty.'
+        type: string
+      id:
+        description: 'Unique ID. You can leave this empty.'
+        type: string
+
+jobs:
+
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      containers: ${{ steps.rhub-setup.outputs.containers }}
+      platforms: ${{ steps.rhub-setup.outputs.platforms }}
+
+    steps:
+    # NO NEED TO CHECKOUT HERE
+    - uses: r-hub/actions/setup@v1
+      with:
+        config: ${{ github.event.inputs.config || 'windows,macos,macos-arm64,m1-san,clang-asan,clang-ubsan,gcc-asan,valgrind,rchk,nold,nosuggests,intel,lto,c23,ubuntu-next,ubuntu-release' }}
+      id: rhub-setup
+
+  linux-containers:
+    needs: setup
+    if: ${{ needs.setup.outputs.containers != '[]' }}
+    runs-on: ubuntu-latest
+    name: ${{ matrix.config.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJson(needs.setup.outputs.containers) }}
+    container:
+      image: ${{ matrix.config.container }}
+
+    steps:
+      - uses: r-hub/actions/checkout@v1
+      - uses: r-hub/actions/platform-info@v1
+        with:
+          token: ${{ secrets.RHUB_TOKEN }}
+          job-config: ${{ matrix.config.job-config }}
+      - uses: r-hub/actions/setup-deps@v1
+        with:
+          token: ${{ secrets.RHUB_TOKEN }}
+          job-config: ${{ matrix.config.job-config }}
+      - uses: r-hub/actions/run-check@v1
+        with:
+          token: ${{ secrets.RHUB_TOKEN }}
+          job-config: ${{ matrix.config.job-config }}
+      - name: Platform oracles on the checked installation
+        if: ${{ always() }}
+        shell: bash
+        env:
+          RA_LABEL: ${{ matrix.config.label }}
+        run: |
+          v=$(sed -n 's/^Version: *//p' DESCRIPTION)
+          echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
+          lib=$(find check -maxdepth 3 -type d -name 'RobustArithmetic.Rcheck' | head -n 1)
+          if [ -z "$lib" ]; then echo "O_PLATFORM FAIL no checked installation"; exit 1; fi
+          status=0
+          if [ "$RA_LABEL" = "nosuggests" ]; then
+            # The check above ran without suggested packages. The reference for the
+            # correct-rounding oracle is installed afterwards, in a separate library
+            # seen only by the oracle; if it cannot be installed, the platform fails.
+            mpfrlib=$(mktemp -d)
+            if Rscript -e 'lib <- commandArgs(TRUE)[1]; install.packages("Rmpfr", lib = lib, repos = "https://cloud.r-project.org"); if (!requireNamespace("Rmpfr", lib.loc = lib, quietly = TRUE)) quit(status = 1)' "$mpfrlib" > oracle-cr-install.txt 2>&1; then
+              R_LIBS="$mpfrlib" Rscript dev/platform/O_CR_RMPFR.R "$lib" 60000 20260914 > oracle-cr.txt 2>&1 || status=1
+            else
+              { echo "O_CR_RMPFR FAIL Rmpfr could not be installed in a separate library"; cat oracle-cr-install.txt; } > oracle-cr.txt
+              status=1
+            fi
+          else
+            Rscript dev/platform/O_CR_RMPFR.R "$lib" 60000 20260914 > oracle-cr.txt 2>&1 || status=1
+          fi
+          Rscript dev/platform/O_PLATFORM.R "$lib" > oracle-platform.txt 2>&1 || status=1
+          cp "$lib/00check.log" 00check.log 2>/dev/null || true
+          cat identity.txt oracle-cr.txt oracle-platform.txt
+          exit $status
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: ${{ matrix.config.label }}-${{ github.job }}-${{ strategy.job-index }}-oracles
+          path: |
+            identity.txt
+            oracle-cr.txt
+            oracle-platform.txt
+            00check.log
+
+  other-platforms:
+    needs: setup
+    if: ${{ needs.setup.outputs.platforms != '[]' }}
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJson(needs.setup.outputs.platforms) }}
+
+    steps:
+      - uses: r-hub/actions/checkout@v1
+      - uses: r-hub/actions/setup-r@v1
+        with:
+          job-config: ${{ matrix.config.job-config }}
+          token: ${{ secrets.RHUB_TOKEN }}
+      - uses: r-hub/actions/platform-info@v1
+        with:
+          token: ${{ secrets.RHUB_TOKEN }}
+          job-config: ${{ matrix.config.job-config }}
+      - uses: r-hub/actions/setup-deps@v1
+        with:
+          job-config: ${{ matrix.config.job-config }}
+          token: ${{ secrets.RHUB_TOKEN }}
+      - uses: r-hub/actions/run-check@v1
+        with:
+          job-config: ${{ matrix.config.job-config }}
+          token: ${{ secrets.RHUB_TOKEN }}
+      - name: Platform oracles on the checked installation
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          v=$(sed -n 's/^Version: *//p' DESCRIPTION)
+          echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
+          lib=$(find check -maxdepth 3 -type d -name 'RobustArithmetic.Rcheck' | head -n 1)
+          if [ -z "$lib" ]; then echo "O_PLATFORM FAIL no checked installation"; exit 1; fi
+          status=0
+          Rscript dev/platform/O_CR_RMPFR.R "$lib" 60000 20260914 > oracle-cr.txt 2>&1 || status=1
+          Rscript dev/platform/O_PLATFORM.R "$lib" > oracle-platform.txt 2>&1 || status=1
+          cp "$lib/00check.log" 00check.log 2>/dev/null || true
+          cat identity.txt oracle-cr.txt oracle-platform.txt
+          exit $status
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: ${{ matrix.config.label }}-${{ github.job }}-${{ strategy.job-index }}-oracles
+          path: |
+            identity.txt
+            oracle-cr.txt
+            oracle-platform.txt
+            00check.log

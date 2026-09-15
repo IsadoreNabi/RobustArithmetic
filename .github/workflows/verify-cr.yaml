@@ -1,0 +1,106 @@
+name: verify-correct-rounding
+
+# On each real platform it builds the source tarball, runs the natural check on
+# that tarball, and runs two oracles kept in dev/platform/ on the installation the
+# check produced: correct rounding of the bundled elementary functions against a
+# reference computed with Rmpfr on the same machine, and the silence and health
+# of an ordinary installation. Every artifact carries identity.txt with the commit
+# and the package version, and the check log, so that the matrix can be tied to
+# one source revision and judged on its checks.
+#
+# The two macOS runners pinned to R 4.5.2 are fixed neighbouring controls for
+# CRAN's r-oldrel-macos-arm64 and r-oldrel-macos-x86_64: they cover the released
+# R 4.5.2 on macOS 15 in both architectures. They do not reproduce those CRAN
+# configurations, which ran R 4.5.2 Patched r89382 on macOS 13.
+
+on:
+  workflow_dispatch:
+  # A workflow_dispatch trigger only works once the file exists on the default
+  # branch; the resubmission verification runs on its working branch instead.
+  push:
+    branches:
+      - cran-0.2.0-verify
+
+jobs:
+  verify:
+    name: ${{ matrix.os }} (R ${{ matrix.r }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-2022, r: release}
+          - {os: windows-2022, r: devel}
+          - {os: windows-latest, r: release}
+          - {os: macos-latest, r: release}
+          - {os: macos-15, r: release}
+          - {os: macos-15, r: '4.5.2'}
+          - {os: macos-15-intel, r: release}
+          - {os: macos-15-intel, r: '4.5.2'}
+          - {os: ubuntu-latest, r: release}
+          - {os: ubuntu-latest, r: devel}
+          - {os: ubuntu-24.04-arm, r: release}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::Rmpfr, any::testthat, any::knitr, any::rmarkdown
+          needs: check
+
+      - name: Identity of the verified source
+        shell: bash
+        run: |
+          v=$(sed -n 's/^Version: *//p' DESCRIPTION)
+          echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
+          cat identity.txt
+
+      - name: Build the source tarball and run the natural check on it
+        shell: bash
+        env:
+          _R_CHECK_FORCE_SUGGESTS_: "true"
+          _R_CHECK_CRAN_INCOMING_: "false"
+        run: |
+          mkdir -p "$RUNNER_TEMP/check"
+          R CMD build .
+          mv RobustArithmetic_*.tar.gz "$RUNNER_TEMP/check/"
+          status=0
+          (cd "$RUNNER_TEMP/check" && R CMD check --as-cran --no-manual RobustArithmetic_*.tar.gz) || status=$?
+          cp "$RUNNER_TEMP/check/RobustArithmetic.Rcheck/00check.log" 00check.log || true
+          echo "RA_LIB=$RUNNER_TEMP/check/RobustArithmetic.Rcheck" >> "$GITHUB_ENV"
+          exit $status
+
+      - name: Correct rounding against Rmpfr on this machine
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          Rscript dev/platform/O_CR_RMPFR.R "$RA_LIB" 60000 20260914 > cr.txt 2>&1
+          status=$?
+          cat cr.txt
+          exit $status
+
+      - name: A healthy installation is silent and not degraded
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          Rscript dev/platform/O_PLATFORM.R "$RA_LIB" > platform.txt 2>&1
+          status=$?
+          cat platform.txt
+          exit $status
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: verify-${{ matrix.os }}-r${{ matrix.r }}
+          path: |
+            identity.txt
+            cr.txt
+            platform.txt
+            00check.log
