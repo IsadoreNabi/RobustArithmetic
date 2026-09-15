@@ -91,16 +91,20 @@ jobs:
           v=$(sed -n 's/^Version: *//p' DESCRIPTION)
           echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
           if [ "$RA_LABEL" = "rchk" ]; then
-            # The rchk container runs its own script instead of R CMD check: it installs
-            # the package into the library below (the path its "Check for rchk errors"
-            # step reads) and writes the bcheck report next to the shared object, which
-            # replaces 00check.log in the artifact.
-            lib=/opt/R/devel-rchk/packages/lib
-            if [ ! -d "$lib/RobustArithmetic" ]; then echo "O_PLATFORM FAIL no rchk installation"; exit 1; fi
-          else
-            lib=$(find check -maxdepth 3 -type d -name 'RobustArithmetic.Rcheck' | head -n 1)
-            if [ -z "$lib" ]; then echo "O_PLATFORM FAIL no checked installation"; exit 1; fi
+            # The rchk container runs its own script instead of R CMD check. That script
+            # installs only the compiled library (R CMD INSTALL --libs-only --no-test-load)
+            # for static analysis and installs no suggested package, so the package cannot
+            # be loaded there and the numerical oracles run on the other platforms. The
+            # artifact carries the identity and the bcheck report the R-hub step reads.
+            bc=/opt/R/devel-rchk/packages/lib/RobustArithmetic/libs/RobustArithmetic.so.bcheck
+            if [ ! -f "$bc" ]; then echo "RCHK FAIL no bcheck report"; exit 1; fi
+            cp "$bc" rchk.bcheck
+            cat identity.txt rchk.bcheck
+            if ! grep -qE '^Analyzed [0-9]+ functions' rchk.bcheck; then echo "RCHK FAIL no Analyzed line"; exit 1; fi
+            exit 0
           fi
+          lib=$(find check -maxdepth 3 -type d -name 'RobustArithmetic.Rcheck' | head -n 1)
+          if [ -z "$lib" ]; then echo "O_PLATFORM FAIL no checked installation"; exit 1; fi
           status=0
           if [ "$RA_LABEL" = "nosuggests" ]; then
             # The check above ran without suggested packages. The reference for the
@@ -117,11 +121,7 @@ jobs:
             Rscript dev/platform/O_CR_RMPFR.R "$lib" 60000 20260914 > oracle-cr.txt 2>&1 || status=1
           fi
           Rscript dev/platform/O_PLATFORM.R "$lib" > oracle-platform.txt 2>&1 || status=1
-          if [ "$RA_LABEL" = "rchk" ]; then
-            cp "$lib/RobustArithmetic/libs/RobustArithmetic.so.bcheck" rchk.bcheck 2>/dev/null || true
-          else
-            cp "$lib/00check.log" 00check.log 2>/dev/null || true
-          fi
+          cp "$lib/00check.log" 00check.log 2>/dev/null || true
           cat identity.txt oracle-cr.txt oracle-platform.txt
           exit $status
       - uses: actions/upload-artifact@v7

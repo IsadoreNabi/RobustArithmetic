@@ -55,13 +55,6 @@ jobs:
           extra-packages: any::Rmpfr, any::testthat, any::knitr, any::rmarkdown
           needs: check
 
-      - name: Identity of the verified source
-        shell: bash
-        run: |
-          v=$(sed -n 's/^Version: *//p' DESCRIPTION)
-          echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
-          cat identity.txt
-
       - name: Build the source tarball and run the natural check on it
         shell: bash
         env:
@@ -76,6 +69,16 @@ jobs:
           cp "$RUNNER_TEMP/check/RobustArithmetic.Rcheck/00check.log" 00check.log || true
           echo "RA_LIB=$RUNNER_TEMP/check/RobustArithmetic.Rcheck" >> "$GITHUB_ENV"
           exit $status
+
+      # Written after R CMD build: a file created in the source directory before the
+      # build enters the tarball and the check reports it as a non-standard top-level file.
+      - name: Identity of the verified source
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          v=$(sed -n 's/^Version: *//p' DESCRIPTION)
+          echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
+          cat identity.txt
 
       - name: Correct rounding against Rmpfr on this machine
         if: ${{ always() }}
