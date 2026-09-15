@@ -200,16 +200,10 @@ test_that("the error of the included path is measured against its declared bound
   expect_true(all(c("observed", "published", "slack", "used") %in% names(m)))
   expect_true(all(m$published == 0.5))
   expect_identical(m$slack, rep(2L, 16L))
-  ## The permanent scenario harness deliberately replaces this instrument in
-  ## its Windows emulation so that the degradation gate can be exercised. In
-  ## every ordinary run, including a real Windows run, the included evaluator
-  ## itself must remain within the half-unit bound.
-  if (identical(Sys.getenv("RA_SCENARIO"), "windows")) {
-    expect_true(any(!is.na(m$observed) & m$observed > m$slack))
-    expect_true(isTRUE(.ra_state$fast_degraded))
-  } else {
-    expect_true(all(!is.na(m$observed) & m$observed <= 0.5))
-  }
+  ## This is a property of the included evaluator and therefore has the same
+  ## assertion in every process and on every platform. Scenario hooks exercise
+  ## safeguard failures outside the package test suite.
+  expect_true(all(!is.na(m$observed) & m$observed <= 0.5))
   ## and the measurement resolves fractions of a unit, which is what it is for
   expect_true(any(!is.na(m$observed) & m$observed %% 1 != 0))
 })

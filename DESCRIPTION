@@ -55,7 +55,7 @@ Description: Verified interval arithmetic for R, in the inf-sup (endpoint)
 License: GPL (>= 3)
 Encoding: UTF-8
 Depends: R (>= 4.1)
-Imports: compiler, stats
+Imports: stats
 Suggests: Rmpfr, testthat (>= 3.0.0), knitr, rmarkdown
 VignetteBuilder: knitr
 Config/testthat/edition: 3

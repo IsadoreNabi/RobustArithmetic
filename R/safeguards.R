@@ -1,286 +1,268 @@
-## The safeguards of the fast level.
+## Safeguards of the fast level.
 ##
-## The fast level rests on a declared slack over a measured error, and the
-## threat that measurement leaves open is exact: an insufficient slack would
-## produce an invalid enclosure indistinguishable from a valid one at run
-## time. Nothing printed would show it. This file turns that invisible
-## failure mode into a trip wire that is tested on this machine, on the
-## evaluation route in use, at every load of the package.
+## The fast level uses the correctly rounded binary64 evaluator included in
+## the package. Its load-time safeguard therefore verifies that evaluator, not
+## a version string or a platform label. Each sentinel stores an independently
+## computed result, and the running evaluator must reproduce it bit for bit.
+## With Rmpfr available, the first fast use also audits a fresh sample against
+## MPFR. Either disagreement degrades the fast level for the session.
 ##
-## Four safeguards live here; the fifth is the pair of tests that prove the
-## trip wire can trip. Load sentinels: the published worst-case inputs of the
-## system library plus the points where the evaluation route of R was measured
-## to differ from it, each stored with its correctly rounded value bracketed
-## by two doubles computed in multiprecision and verified by a second,
-## independent way. Session audit: with the backend present, the first fast
-## evaluation of a session measures the route against it and caches the
-## verdict. Provenance: every interval says whether its guarantee is a
-## theorem or a measured convention, the weaker word wins on mixture, and the
-## printed form repeats it. Environment anchor: the sentinels say what they
-## were generated against, and a mismatch is named rather than discovered.
+## Degradation is session state. The first affected result warns once and
+## escalates to the rigorous level when Rmpfr is available. Without Rmpfr every
+## affected evaluation refuses with a typed error. The public status function
+## exposes the state, its reason, the sentinel verification and the audit.
 
-## The mutable state of the loaded namespace. Created here, filled by
-## .onLoad(); nothing in this file runs at load time beyond this constructor,
-## because top-level code cannot assume the reading order of the sources.
+## Mutable state of the loaded namespace. .onLoad() clears and rebuilds every
+## binding so that calling it again is a complete self-verification.
 .ra_state <- new.env(parent = emptyenv())
 
-#' @title The load sentinels of the fast level
-#' @description Returns the table of sentinel points against which the fast
-#'   level is checked at every load: for each admitted function, the input
-#'   with the largest known error of the system library, and, where the
-#'   evaluation route of R was measured to differ from that library, the
-#'   point of the discrepancy.
-#' @return A data frame with one row per sentinel and columns \code{fun},
-#'   \code{x}, \code{dn}, \code{up}, \code{role} and \code{slack}. \code{dn}
-#'   and \code{up} are the two doubles that bracket the correctly rounded
-#'   value of the function at \code{x}.
-#' @details The worst-case inputs are the published ones for the library this
-#'   package was anchored against; the report they come from is named in the
-#'   references, and the exact table and column are recorded in the generator
-#'   script \code{dev/gen_sentinels.R}, which also verifies every bracketing
-#'   pair at two unrelated precisions and, where a series is cheap, against a
-#'   series. The discrepancy points are the ones measured in this project:
-#'   at them, the route R uses does not return the correctly rounded value
-#'   the library returns when called from compiled C code.
+.ra_binary64_bits <- function(value) {
+  vapply(value, function(element) {
+    paste(rev(as.character(writeBin(element, raw(), size = 8L,
+                                    endian = "little"))),
+          collapse = "")
+  }, character(1L), USE.NAMES = FALSE)
+}
+
+#' Independent sentinels of the fast level
+#'
+#' Return the difficult binary64 cases used to verify the elementary-function
+#' evaluator included in the package whenever the namespace loads.
+#'
+#' @return A data frame with eight rows for each admitted function and columns
+#'   `fun`, `x`, `cr`, `role`, `source` and `source_index`. `cr` is the
+#'   correctly rounded binary64 value independently computed for `x`.
+#'
+#' @details For the fifteen software kernels, the inputs are selected
+#'   deterministically across the difficult-case files in the sealed
+#'   CORE-MATH archive. Square-root inputs come from the sealed binary64 sample
+#'   used by the package's independent kernel tests. `dev/gen_sentinels.R`
+#'   evaluates every selected input with Rmpfr at 200 bits and converts the
+#'   result once with `Rmpfr::asNumeric()`. It never obtains an expected value
+#'   from the evaluator that the table guards.
+#'
 #' @section Methodological notes:
-#'   A sentinel is only as good as the independence of its stored value. The
-#'   bracketing pairs are computed by the multiprecision backend at 500 bits,
-#'   re-verified at 800, and stored as data, so the check at load time makes
-#'   no call to the backend and costs microseconds. Regenerating them is a
-#'   deliberate act with its script, never a side effect.
+#'   A self-check is informative only when its expected values do not share the
+#'   implementation under examination. The generator therefore seals the input
+#'   archive by its SHA-256 digest, derives the expected values through MPFR and
+#'   stores those values as package data. Loading the package needs no optional
+#'   dependency and does not regenerate the evidence.
+#'
 #' @section Dependencies:
-#'   Base R. The generator script needs 'Rmpfr', but its product is data.
+#'   Base R. Regeneration requires `Rmpfr`; ordinary use does not.
+#'
 #' @references
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Fousse, L., Hanrot, G., Lefevre, V., Pelissier, P., & Zimmermann, P. (2007).
+#'   MPFR: A multiple-precision binary floating-point library with correct
+#'   rounding. *ACM Transactions on Mathematical Software, 33*(2), Article 13.
+#'   https://doi.org/10.1145/1236463.1236468
+#'
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In *2022 IEEE 29th Symposium on Computer Arithmetic (ARITH)* (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
+#'
 #' @examples
-#' head(ra_sentinels())
-#' @seealso [ra_check_sentinels()] for the check the table feeds,
-#'   [ra_environment_anchor()] for what it was generated against.
+#' sentinels <- ra_sentinels()
+#' table(sentinels$fun)
+#'
+#' @seealso [ra_check_sentinels()] for the bitwise verification and
+#'   [ra_fast_level_status()] for the session state.
+#' @md
 #' @export
 ra_sentinels <- function() {
   .ra_sentinels
 }
 
-#' @title Check the evaluation route in use against the sentinels
-#' @description Evaluates every admitted function on its sentinel points by
-#'   the same route the fast level uses, counts the outward rounding steps
-#'   needed for the enclosure to contain the correctly rounded value, and
-#'   compares that count against the declared slack.
-#' @param slack An optional integer vector recycled over the rows, replacing
-#'   the declared slack for the comparison. The check itself does not change:
-#'   this is the handle by which the tests prove the check can fail, and it
-#'   exists because a watchman that cannot fail for the thing it watches is
-#'   not a watchman.
-#' @return A data frame with columns \code{fun}, \code{x}, \code{role},
-#'   \code{steps_needed}, \code{slack} and \code{ok}. \code{steps_needed} is
-#'   \code{NA} when even a generous search bound did not suffice, which is
-#'   itself a failure.
-#' @details The evaluation is one ordinary vectorized call per function, the
-#'   same shape the fast level uses, so the check exercises the route in use
-#'   rather than a look-alike. A row fails when the steps needed exceed the
-#'   slack; any failing row degrades the fast level for the session, and the
-#'   degradation speaks through \code{ra_fast_level_unsafe} rather than
-#'   through a wrong enclosure.
+#' Verify the included evaluator against independent sentinels
+#'
+#' Evaluate every stored difficult case through the same binary64 evaluator as
+#' the fast level and compare each result bit for bit with its independent
+#' correctly rounded value.
+#'
+#' @return A data frame with columns `fun`, `x`, `role`, `source`,
+#'   `source_index`, `expected`, `observed`, `expected_bits`, `observed_bits`
+#'   and `ok`. Each row of `ok` is `TRUE` only when the two binary64 bit
+#'   patterns are identical.
+#'
+#' @details The comparison preserves distinctions hidden by ordinary numeric
+#'   equality, including the sign of zero. Any error while evaluating the
+#'   table makes the load-time verification unavailable, which degrades the
+#'   fast level rather than certifying an unchecked evaluator.
+#'
 #' @section Methodological notes:
-#'   The check runs at every load rather than once at installation, because
-#'   the thing it watches is the pairing of this package with the mathematics
-#'   of the running process, and that pairing changes with library upgrades
-#'   that never notify the package.
+#'   Version agreement cannot establish that compiled mathematics behaves as
+#'   intended. This check asks the installed evaluator itself to reproduce
+#'   independently generated difficult cases. Its control is exercised by
+#'   replacing that evaluator with a one-neighbour perturbation in the scenario
+#'   harness and requiring the verification to fail.
+#'
 #' @section Dependencies:
-#'   Base R.
+#'   Base R and the package's registered native routines.
+#'
 #' @references
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In *2022 IEEE 29th Symposium on Computer Arithmetic (ARITH)* (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
+#'
 #' @examples
-#' chk <- ra_check_sentinels()
-#' all(chk$ok)
-#' @seealso [ra_sentinels()] for the table, [ra_environment_anchor()] for the
-#'   named anchor a failure is explained against.
+#' check <- ra_check_sentinels()
+#' all(check$ok)
+#'
+#' @seealso [ra_sentinels()] for the stored cases and
+#'   [ra_fast_level_status()] for the session-level consequence.
+#' @md
 #' @export
-ra_check_sentinels <- function(slack = NULL) {
-  s <- .ra_sentinels
-  need <- rep(NA_integer_, nrow(s))
-  bound <- max(s$slack) + 2L
-  for (f in unique(s$fun)) {
-    i <- which(s$fun == f)
-    y <- do.call(f, list(s$x[i]))
-    for (j in seq_along(i)) {
-      lo <- y[j]
-      hi <- y[j]
-      for (k in 0:bound) {
-        if (lo <= s$dn[i[j]] && hi >= s$up[i[j]]) {
-          need[i[j]] <- k
-          break
-        }
-        lo <- ra_pred(lo)
-        hi <- ra_succ(hi)
-      }
-    }
+ra_check_sentinels <- function() {
+  sentinels <- .ra_sentinels
+  observed <- rep(NA_real_, nrow(sentinels))
+  for (function_name in unique(sentinels$fun)) {
+    selected <- sentinels$fun == function_name
+    observed[selected] <- .ra_cr(function_name, sentinels$x[selected])
   }
-  sl <- if (is.null(slack)) s$slack else rep_len(as.integer(slack), nrow(s))
-  data.frame(fun = s$fun, x = s$x, role = s$role, steps_needed = need,
-             slack = sl, ok = !is.na(need) & need <= sl,
-             stringsAsFactors = FALSE)
+  expected_bits <- .ra_binary64_bits(sentinels$cr)
+  observed_bits <- .ra_binary64_bits(observed)
+  data.frame(
+    fun = sentinels$fun,
+    x = sentinels$x,
+    role = sentinels$role,
+    source = sentinels$source,
+    source_index = sentinels$source_index,
+    expected = sentinels$cr,
+    observed = observed,
+    expected_bits = expected_bits,
+    observed_bits = observed_bits,
+    ok = expected_bits == observed_bits,
+    stringsAsFactors = FALSE
+  )
 }
 
-#' @title The environment anchor of the sentinels
-#' @description Returns what the sentinel table was generated against and the
-#'   comparison of the running environment with it, so that a sentinel
-#'   failure can be explained rather than merely reported.
-#' @return A list with two fields: \code{anchor}, the stored description
-#'   (C library version, R version, byte-code compilation level, platform
-#'   identifier, backend version, generation date and source of the worst-case
-#'   inputs),
-#'   and \code{mismatch}, a character vector naming each comparable field that
-#'   differs or cannot be identified, empty only when every compared field
-#'   matches.
-#' @details The comparison covers \code{r_version}, \code{jit_level},
-#'   \code{libm} and \code{platform}. The platform is the identifier reported
-#'   by \code{R.version$platform}. An unavailable C library or platform
-#'   identifier, in either the running environment or the stored anchor, is
-#'   itself a mismatch: lack of evidence cannot establish that the running
-#'   environment is the generator. The anchor explains; it does not guard. The
-#'   guard is the sentinel check itself, which measures the route rather than
-#'   trusting any version string.
+#' Status of the fast level in the current session
+#'
+#' Report whether the fast level is degraded, why it is degraded, and the two
+#' verifications that determine its session state.
+#'
+#' @return A list with four fields: `degraded`, a logical scalar; `reason`, an
+#'   empty character vector while healthy or a character scalar naming every
+#'   active cause; `sentinels`, the data frame returned by
+#'   [ra_check_sentinels()] at load time or `NULL` if that verification could
+#'   not run; and `audit`, the first-use comparison against MPFR or `NULL` until
+#'   that audit runs.
+#'
+#' @details The status is read-only. A failed load-time sentinel verification
+#'   degrades the level immediately. With `Rmpfr` available, the first fast
+#'   evaluation also runs [ra_measure_library_error()] and degrades the level
+#'   if an observed error exceeds its declared slack. The first result affected
+#'   by a degraded state emits one warning of class `ra_fast_level_unsafe` and
+#'   escalates to the rigorous level; later results remain rigorous without
+#'   repeating the warning. Without `Rmpfr`, every affected evaluation refuses
+#'   with an error of the same class because no rigorous result can replace it.
+#'
 #' @section Methodological notes:
-#'   A version string equal to the anchor does not prove the route is the
-#'   anchored one, and a different string does not prove it is not; this is
-#'   why the anchor is reported alongside the check instead of replacing it.
+#'   Session state and result provenance answer different questions. This
+#'   function records whether the fast route is available and why. [ra_prov()]
+#'   records the guarantee carried by one returned interval, so an interval
+#'   escalated after degradation carries `theorem` without changing its class.
+#'
 #' @section Dependencies:
-#'   Base R. Reading the C library version uses \code{getconf} where it
-#'   exists; a missing or unusable response is reported as a mismatch.
+#'   Base R. The first-use audit requires `Rmpfr`; reading the status does not.
+#'
 #' @references
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Fousse, L., Hanrot, G., Lefevre, V., Pelissier, P., & Zimmermann, P. (2007).
+#'   MPFR: A multiple-precision binary floating-point library with correct
+#'   rounding. *ACM Transactions on Mathematical Software, 33*(2), Article 13.
+#'   https://doi.org/10.1145/1236463.1236468
+#'
 #' @examples
-#' ra_environment_anchor()
-#' @seealso [ra_check_sentinels()], [ra_sentinels()].
+#' status <- ra_fast_level_status()
+#' status$degraded
+#' all(status$sentinels$ok)
+#'
+#' @seealso [ra_check_sentinels()], [ra_measure_library_error()] and
+#'   [ra_prov()].
+#' @md
 #' @export
-ra_environment_anchor <- function() {
-  list(anchor = .ra_anchor, mismatch = .ra_compare_anchor(.ra_anchor))
+ra_fast_level_status <- function() {
+  degraded <- isTRUE(.ra_state$fast_degraded)
+  list(
+    degraded = degraded,
+    reason = if (degraded) .ra_degradation_reason() else character(0),
+    sentinels = .ra_state$sentinel_check,
+    audit = .ra_state$fast_audit
+  )
 }
 
-## Compare the running environment against an anchor, naming what differs.
-## Split from the public function so the tests can hand it a doctored anchor
-## and prove the comparator can fail for what it watches.
-.ra_compare_anchor <- function(anchor) {
-  out <- character(0)
-  rv <- paste(R.version$major, R.version$minor, sep = ".")
-  if (!identical(rv, anchor$r_version)) {
-    out <- c(out, paste0("r_version is '", rv, "' and the sentinels were ",
-                         "generated on '", anchor$r_version, "'"))
-  }
-  jit <- compiler::enableJIT(-1L)
-  if (!identical(jit, anchor$jit_level)) {
-    out <- c(out, paste0("jit_level is ", jit,
-                         " and the sentinels were generated at ",
-                         anchor$jit_level))
-  }
-  libm <- tryCatch(
-    suppressWarnings(system2("getconf", "GNU_LIBC_VERSION", stdout = TRUE,
-                             stderr = FALSE)[1L]),
-    error = function(e) NA_character_)
-  libm_known <- is.character(libm) && length(libm) == 1L &&
-    !is.na(libm) && nzchar(libm)
-  anchor_libm_known <- is.character(anchor$libm) &&
-    length(anchor$libm) == 1L && !is.na(anchor$libm) && nzchar(anchor$libm)
-  if (!libm_known) {
-    out <- c(out, "libm could not be identified in the running environment")
-  } else if (!anchor_libm_known) {
-    out <- c(out, "libm could not be identified in the sentinel anchor")
-  } else if (!identical(libm, anchor$libm)) {
-    out <- c(out, paste0("libm reports '", libm,
-                         "' and the sentinels were generated against '",
-                         anchor$libm, "'"))
-  }
-  platform <- R.version$platform
-  platform_known <- is.character(platform) &&
-    length(platform) == 1L && !is.na(platform) &&
-    nzchar(platform)
-  anchor_platform_known <- is.character(anchor$platform) &&
-    length(anchor$platform) == 1L && !is.na(anchor$platform) &&
-    nzchar(anchor$platform)
-  if (!platform_known) {
-    out <- c(out, paste0("platform could not be identified in the running ",
-                         "environment"))
-  } else if (!anchor_platform_known) {
-    out <- c(out, "platform could not be identified in the sentinel anchor")
-  } else if (!identical(platform, anchor$platform)) {
-    out <- c(out, paste0("platform is '", platform,
-                         "' and the sentinels were generated on '",
-                         anchor$platform, "'"))
-  }
-  out
-}
-
-## The gate every fast-level evaluation passes. Returns the level to use.
-## When the fast level is degraded it escalates to the rigorous level with a
-## warning if the backend is there, and raises if it is not: a word, never
-## silence. With the backend present, the first fast use of the session also
-## audits the route against the declared slack and applies the same
-## degradation if the audit fails.
+## Gate passed by every requested fast-level evaluation. The audit flag is set
+## before measurement so that the measurement cannot re-enter the audit.
 .ra_fast_gate <- function(fun) {
-  if (!isTRUE(.ra_state$fast_degraded) && !isTRUE(.ra_state$fast_audited) &&
-      ra_has_mpfr()) {
-    ## the flag goes up before measuring so the measurement cannot re-enter
+  if (!isTRUE(.ra_state$fast_degraded) &&
+      !isTRUE(.ra_state$fast_audited) && ra_has_mpfr()) {
     assign("fast_audited", TRUE, envir = .ra_state)
-    m <- ra_measure_library_error(n = 400L)
-    assign("fast_audit", m, envir = .ra_state)
-    if (any(!is.na(m$observed) & m$observed > m$slack)) {
+    measurement <- ra_measure_library_error(n = 400L)
+    assign("fast_audit", measurement, envir = .ra_state)
+    above <- !is.na(measurement$observed) &
+      measurement$observed > measurement$slack
+    if (any(above)) {
       assign("fast_degraded", TRUE, envir = .ra_state)
     }
   }
+
   if (!isTRUE(.ra_state$fast_degraded)) return("fast")
-  why <- .ra_degradation_reason()
+
+  reason <- .ra_degradation_reason()
   if (ra_has_mpfr()) {
-    ra_warn("fast_level_unsafe",
-            paste0("The fast level is degraded for this session (", why,
-                   "). `", fun, "` escalates to the rigorous level ",
-                   "(the declared fallback), which is slower ",
-                   "and remains a theorem."))
+    if (!isTRUE(.ra_state$fast_warning_emitted)) {
+      assign("fast_warning_emitted", TRUE, envir = .ra_state)
+      ra_warn(
+        "fast_level_unsafe",
+        paste0(
+          "The fast level is degraded for this session (", reason,
+          "). This result escalates to the rigorous level, remains a theorem, ",
+          "and later results in this session will not repeat this warning."
+        )
+      )
+    }
     return("rigorous")
   }
-  ra_stop("fast_level_unsafe",
-          paste0("The fast level is degraded for this session (", why,
-                 ") and package 'Rmpfr' is not installed, so there is no ",
-                 "rigorous level to escalate to. No enclosure is returned: ",
-                 "a wrong one would be indistinguishable from a right one."))
+
+  ra_stop(
+    "fast_level_unsafe",
+    paste0(
+      "The fast level is degraded for this session (", reason,
+      ") and package 'Rmpfr' is not installed, so there is no rigorous level ",
+      "to use instead. No enclosure is returned."
+    )
+  )
 }
 
-## One sentence naming why the fast level is degraded, with the environment
-## anchor appended when it differs: the anchor explains, the check guards.
 .ra_degradation_reason <- function() {
-  chk <- .ra_state$sentinel_check
-  aud <- .ra_state$fast_audit
-  parts <- character(0)
-  if (is.null(chk)) {
-    parts <- c(parts, "the load-time sentinel check could not run")
-  } else if (any(!chk$ok)) {
-    bad <- chk[!chk$ok, , drop = FALSE]
-    parts <- c(parts, paste0("sentinel check failed for ",
-                             paste(unique(bad$fun), collapse = ", ")))
+  sentinel_check <- .ra_state$sentinel_check
+  audit <- .ra_state$fast_audit
+  reasons <- character(0)
+
+  if (is.null(sentinel_check)) {
+    reasons <- c(reasons, "the load-time sentinel verification could not run")
+  } else if (any(!sentinel_check$ok)) {
+    failed <- unique(sentinel_check$fun[!sentinel_check$ok])
+    reasons <- c(
+      reasons,
+      paste0("the load-time sentinel verification disagreed bit for bit for ",
+             paste(failed, collapse = ", "))
+    )
   }
-  if (!is.null(aud) && any(!is.na(aud$observed) & aud$observed > aud$slack)) {
-    bad <- aud[!is.na(aud$observed) & aud$observed > aud$slack, , drop = FALSE]
-    parts <- c(parts, paste0("session audit measured the route above its ",
-                             "slack for ",
-                             paste(unique(bad$fun), collapse = ", ")))
+
+  if (!is.null(audit)) {
+    above <- !is.na(audit$observed) & audit$observed > audit$slack
+    if (any(above)) {
+      reasons <- c(
+        reasons,
+        paste0("the session audit measured the included evaluator above its ",
+               "slack for ", paste(unique(audit$fun[above]), collapse = ", "))
+      )
+    }
   }
-  if (!length(parts)) parts <- "degraded by request"
-  mm <- .ra_state$anchor_mismatch
-  if (length(mm)) {
-    parts <- c(parts, paste0("note that the environment differs from the ",
-                             "sentinel anchor: ",
-                             paste(mm, collapse = "; ")))
-  }
-  paste(parts, collapse = "; ")
+
+  if (!length(reasons)) reasons <- "degraded by request"
+  paste(reasons, collapse = "; ")
 }
 
 #' @title The provenance of an interval's guarantee

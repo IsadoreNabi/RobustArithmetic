@@ -2,57 +2,58 @@
 % Please edit documentation in R/safeguards.R
 \name{ra_sentinels}
 \alias{ra_sentinels}
-\title{The load sentinels of the fast level}
+\title{Independent sentinels of the fast level}
 \usage{
 ra_sentinels()
 }
 \value{
-A data frame with one row per sentinel and columns \code{fun},
-  \code{x}, \code{dn}, \code{up}, \code{role} and \code{slack}. \code{dn}
-  and \code{up} are the two doubles that bracket the correctly rounded
-  value of the function at \code{x}.
+A data frame with eight rows for each admitted function and columns
+\code{fun}, \code{x}, \code{cr}, \code{role}, \code{source} and \code{source_index}. \code{cr} is the
+correctly rounded binary64 value independently computed for \code{x}.
 }
 \description{
-Returns the table of sentinel points against which the fast
-  level is checked at every load: for each admitted function, the input
-  with the largest known error of the system library, and, where the
-  evaluation route of R was measured to differ from that library, the
-  point of the discrepancy.
+Return the difficult binary64 cases used to verify the elementary-function
+evaluator included in the package whenever the namespace loads.
 }
 \details{
-The worst-case inputs are the published ones for the library this
-  package was anchored against; the report they come from is named in the
-  references, and the exact table and column are recorded in the generator
-  script \code{dev/gen_sentinels.R}, which also verifies every bracketing
-  pair at two unrelated precisions and, where a series is cheap, against a
-  series. The discrepancy points are the ones measured in this project:
-  at them, the route R uses does not return the correctly rounded value
-  the library returns when called from compiled C code.
+For the fifteen software kernels, the inputs are selected
+deterministically across the difficult-case files in the sealed
+CORE-MATH archive. Square-root inputs come from the sealed binary64 sample
+used by the package's independent kernel tests. \code{dev/gen_sentinels.R}
+evaluates every selected input with Rmpfr at 200 bits and converts the
+result once with \code{Rmpfr::asNumeric()}. It never obtains an expected value
+from the evaluator that the table guards.
 }
 \section{Methodological notes}{
 
-  A sentinel is only as good as the independence of its stored value. The
-  bracketing pairs are computed by the multiprecision backend at 500 bits,
-  re-verified at 800, and stored as data, so the check at load time makes
-  no call to the backend and costs microseconds. Regenerating them is a
-  deliberate act with its script, never a side effect.
+A self-check is informative only when its expected values do not share the
+implementation under examination. The generator therefore seals the input
+archive by its SHA-256 digest, derives the expected values through MPFR and
+stores those values as package data. Loading the package needs no optional
+dependency and does not regenerate the evidence.
 }
 
 \section{Dependencies}{
 
-  Base R. The generator script needs 'Rmpfr', but its product is data.
+Base R. Regeneration requires \code{Rmpfr}; ordinary use does not.
 }
 
 \examples{
-head(ra_sentinels())
+sentinels <- ra_sentinels()
+table(sentinels$fun)
+
 }
 \references{
-Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-  Accuracy of mathematical functions in single, double, double extended, and
-  quadruple precision (edition of February 2026) [Technical report].
-  https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+Fousse, L., Hanrot, G., Lefevre, V., Pelissier, P., & Zimmermann, P. (2007).
+MPFR: A multiple-precision binary floating-point library with correct
+rounding. \emph{ACM Transactions on Mathematical Software, 33}(2), Article 13.
+https://doi.org/10.1145/1236463.1236468
+
+Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+In \emph{2022 IEEE 29th Symposium on Computer Arithmetic (ARITH)} (pp. 26-34).
+IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 }
 \seealso{
-[ra_check_sentinels()] for the check the table feeds,
-  [ra_environment_anchor()] for what it was generated against.
+\code{\link[=ra_check_sentinels]{ra_check_sentinels()}} for the bitwise verification and
+\code{\link[=ra_fast_level_status]{ra_fast_level_status()}} for the session state.
 }

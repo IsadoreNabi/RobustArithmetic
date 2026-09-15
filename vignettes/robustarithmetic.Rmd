@@ -87,6 +87,18 @@ checks the included route against an independent multiprecision referent. The fa
 still carries `measured` provenance because correct rounding of the included software has
 been verified numerically but is not established here as a theorem for every kernel.
 
+The included evaluator also verifies itself at namespace load against independent difficult
+cases, bit for bit. A healthy session starts silently. `ra_fast_level_status()` exposes that
+verification and the first-use multiprecision audit. If either check degrades the fast level,
+the first affected result emits one typed warning and escalates to the rigorous level; later
+results in that session remain rigorous without repeating the warning. Without `Rmpfr`, an
+affected evaluation refuses because no rigorous result is available to replace it. This rule
+is identical whether the package is attached with `library()` or called with `::`.
+
+```{r}
+ra_fast_level_status()$degraded
+```
+
 ## Expressions, and why the centered form exists
 
 Evaluating an expression by substituting an interval for each occurrence of the variable —

@@ -2,61 +2,52 @@
 % Please edit documentation in R/safeguards.R
 \name{ra_check_sentinels}
 \alias{ra_check_sentinels}
-\title{Check the evaluation route in use against the sentinels}
+\title{Verify the included evaluator against independent sentinels}
 \usage{
-ra_check_sentinels(slack = NULL)
-}
-\arguments{
-\item{slack}{An optional integer vector recycled over the rows, replacing
-the declared slack for the comparison. The check itself does not change:
-this is the handle by which the tests prove the check can fail, and it
-exists because a watchman that cannot fail for the thing it watches is
-not a watchman.}
+ra_check_sentinels()
 }
 \value{
-A data frame with columns \code{fun}, \code{x}, \code{role},
-  \code{steps_needed}, \code{slack} and \code{ok}. \code{steps_needed} is
-  \code{NA} when even a generous search bound did not suffice, which is
-  itself a failure.
+A data frame with columns \code{fun}, \code{x}, \code{role}, \code{source},
+\code{source_index}, \code{expected}, \code{observed}, \code{expected_bits}, \code{observed_bits}
+and \code{ok}. Each row of \code{ok} is \code{TRUE} only when the two binary64 bit
+patterns are identical.
 }
 \description{
-Evaluates every admitted function on its sentinel points by
-  the same route the fast level uses, counts the outward rounding steps
-  needed for the enclosure to contain the correctly rounded value, and
-  compares that count against the declared slack.
+Evaluate every stored difficult case through the same binary64 evaluator as
+the fast level and compare each result bit for bit with its independent
+correctly rounded value.
 }
 \details{
-The evaluation is one ordinary vectorized call per function, the
-  same shape the fast level uses, so the check exercises the route in use
-  rather than a look-alike. A row fails when the steps needed exceed the
-  slack; any failing row degrades the fast level for the session, and the
-  degradation speaks through \code{ra_fast_level_unsafe} rather than
-  through a wrong enclosure.
+The comparison preserves distinctions hidden by ordinary numeric
+equality, including the sign of zero. Any error while evaluating the
+table makes the load-time verification unavailable, which degrades the
+fast level rather than certifying an unchecked evaluator.
 }
 \section{Methodological notes}{
 
-  The check runs at every load rather than once at installation, because
-  the thing it watches is the pairing of this package with the mathematics
-  of the running process, and that pairing changes with library upgrades
-  that never notify the package.
+Version agreement cannot establish that compiled mathematics behaves as
+intended. This check asks the installed evaluator itself to reproduce
+independently generated difficult cases. Its control is exercised by
+replacing that evaluator with a one-neighbour perturbation in the scenario
+harness and requiring the verification to fail.
 }
 
 \section{Dependencies}{
 
-  Base R.
+Base R and the package's registered native routines.
 }
 
 \examples{
-chk <- ra_check_sentinels()
-all(chk$ok)
+check <- ra_check_sentinels()
+all(check$ok)
+
 }
 \references{
-Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-  Accuracy of mathematical functions in single, double, double extended, and
-  quadruple precision (edition of February 2026) [Technical report].
-  https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+In \emph{2022 IEEE 29th Symposium on Computer Arithmetic (ARITH)} (pp. 26-34).
+IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 }
 \seealso{
-[ra_sentinels()] for the table, [ra_environment_anchor()] for the
-  named anchor a failure is explained against.
+\code{\link[=ra_sentinels]{ra_sentinels()}} for the stored cases and
+\code{\link[=ra_fast_level_status]{ra_fast_level_status()}} for the session-level consequence.
 }

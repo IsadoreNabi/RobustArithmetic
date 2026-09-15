@@ -1584,3 +1584,44 @@ cota declarada, holgura dos para las dieciséis, monotonía concordante y un má
 una de sus tres compilaciones y conservó cero conjuntos discrepantes. La tabla, la ayuda, la
 viñeta, el título, la descripción y las pruebas afectadas nombran la ruta incluida y su fuente en
 presente, sin trasladar a la exposición pública la cronología de la sustitución.
+
+---
+
+## §15. Las salvaguardas verifican la ruta incluida y comunican el estado de la sesión
+
+El nivel rápido verifica al cargar el paquete el evaluador que efectivamente usa. La tabla
+incorporada contiene 128 centinelas, ocho por cada una de las dieciséis funciones: los de las
+quince funciones de CORE-MATH proceden de los casos difíciles del archivo sellado del commit
+`1ab68b70`, mientras los de la raíz cuadrada proceden de la muestra binaria sellada. El guion
+`dev/gen_sentinels.R` selecciona las entradas de manera determinista, calcula los valores esperados
+con Rmpfr a 200 bits y los convierte una sola vez a doble precisión; nunca obtiene una salida
+esperada de `.ra_cr()`. `ra_check_sentinels()` compara luego ambos patrones binarios bit a bit.
+
+La degradación es un estado de la sesión. `.onLoad()` borra y reconstruye ese estado, de modo que
+su ejecución repetida vuelve a verificar desde cero. `ra_fast_level_status()` expone si el nivel
+está degradado, el motivo, la comprobación de centinelas y la auditoría del primer uso. Con Rmpfr,
+el primer resultado afectado emite una única condición `ra_fast_level_unsafe` y se recalcula por la
+ruta rigurosa con procedencia `theorem`; sin Rmpfr, cada evaluación afectada rehúsa mediante un
+error de la misma clase. Una sesión sana permanece silenciosa tanto al cargar el espacio de nombres
+como al adjuntar el paquete.
+
+El arnés permanente construye e instala el paquete y combina dos controles que no se sustituyen.
+La sonda recorre el estado público y las dieciséis funciones en procesos nuevos; la suite instalada
+se ejecuta además en los estados sano y degradado durante la carga, tanto con el R del sistema y
+Rmpfr como con el R sin doble largo y sin Rmpfr. Los escenarios que dejan roto el evaluador son
+controles de la sonda y no de una suite que debe afirmar redondeo correcto. Dos escenarios
+adicionales cargan el espacio de nombres sin adjuntar el paquete, para conservar la comprobación de
+que el aviso aparece una sola vez también mediante `::`.
+
+La retirada completa del ancla de entorno eliminó el único uso funcional de `compiler`. Por eso
+`DESCRIPTION` declara ahora solamente `stats` en `Imports`; conservar `compiler` mediante una llamada
+ceremonial habría ocultado una dependencia obsoleta sin responsabilidad en el mecanismo vigente. No
+cambian la holgura, la procedencia, el nivel riguroso, el evaluador `.ra_cr()`, la copia de CORE-MATH
+ni sus referencias independientes.
+
+La verificación de cierre exige que pasen los controles de salvaguardas, centinelas, documentación,
+exactitud rápida, tres compilaciones, límites del cambio, las dos suites y los escenarios; que los
+tres chequeos naturales terminen en `Status: OK`; que ninguna prueba ni archivo de `R/` lea
+`RA_SCENARIO`; y que esta sección exista una sola vez. Los oráculos adicionales del arnés comprueban
+por separado que los seis escenarios de raíz están presentes, que las cuatro suites instaladas
+terminan sin fallos y que ningún bloque ejecutado del manifiesto sellado se pierde bajo degradación.

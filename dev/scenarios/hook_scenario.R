@@ -1,48 +1,36 @@
-## Emulate the environments that guard the fast level during scenario checks.
-## This hook runs after the package namespace finishes loading and before it is
-## attached, so startup messages, tests and probes see the same state.
+## Emulate a healthy, load-degraded or broken included evaluator in a fresh
+## process. The hook runs immediately after the namespace's ordinary .onLoad.
+## A perturbed scenario changes only sine, then invokes .onLoad again so the
+## production self-verification, state reset and startup path are exercised.
+## The load-degraded scenario restores the correct evaluator after that check;
+## the broken scenario leaves the perturbation in place.
 local({
-  scenario <- Sys.getenv("RA_SCENARIO", "home")
-  known <- c("home", "anchor", "windows", "load_degraded")
-  if (!scenario %in% known) stop("unknown RA_SCENARIO: ", scenario)
+  scenario <- Sys.getenv("RA_SCENARIO", "healthy")
+  if (!scenario %in% c("healthy", "loaddeg", "broken")) {
+    stop("unknown RA_SCENARIO: ", scenario)
+  }
+  if (identical(scenario, "healthy")) return(invisible())
 
   setHook(packageEvent("RobustArithmetic", "onLoad"), function(pkgname, pkgpath) {
     namespace <- asNamespace("RobustArithmetic")
-    state <- get(".ra_state", envir = namespace)
-    windows_mismatch <- c(
-      "r_version is '4.7.0' and the sentinels were generated on '4.6.1'",
-      "libm could not be identified in the running environment",
-      paste0("platform is 'x86_64-w64-mingw32' and the sentinels were ",
-             "generated on 'x86_64-redhat-linux-gnu'")
-    )
-
-    if (scenario != "home") {
-      assign("anchor_mismatch", windows_mismatch, envir = state)
-    }
-    if (scenario == "windows") {
-      real_measurement <- get("ra_measure_library_error", envir = namespace)
-      emulated_measurement <- function(n = 20000L, seed = NULL, bits = 300L) {
-        measurement <- real_measurement(n = n, seed = seed, bits = bits)
-        selected <- measurement$fun %in% c("sin", "cos")
-        measurement$observed[selected] <- measurement$slack[selected] + 1
-        measurement$used[selected] <-
-          measurement$observed[selected] / measurement$slack[selected]
-        measurement
+    evaluator <- get(".ra_cr", envir = namespace)
+    successor <- get("ra_succ", envir = namespace)
+    broken <- function(fun, x) {
+      value <- evaluator(fun, x)
+      if (identical(fun, "sin")) {
+        finite <- is.finite(value)
+        value[finite] <- successor(value[finite])
       }
-      stopifnot(identical(names(formals(emulated_measurement)),
-                          names(formals(real_measurement))))
-      unlockBinding("ra_measure_library_error", namespace)
-      assign("ra_measure_library_error", emulated_measurement,
-             envir = namespace)
-      lockBinding("ra_measure_library_error", namespace)
+      value
     }
-    if (scenario == "load_degraded") {
-      check <- state$sentinel_check
-      stopifnot(is.data.frame(check),
-                any(check$fun %in% c("sin", "cos")))
-      check$ok[check$fun %in% c("sin", "cos")] <- FALSE
-      assign("sentinel_check", check, envir = state)
-      assign("fast_degraded", TRUE, envir = state)
+    unlockBinding(".ra_cr", namespace)
+    assign(".ra_cr", broken, envir = namespace)
+    lockBinding(".ra_cr", namespace)
+    get(".onLoad", envir = namespace)(dirname(pkgpath), pkgname)
+    if (identical(scenario, "loaddeg")) {
+      unlockBinding(".ra_cr", namespace)
+      assign(".ra_cr", evaluator, envir = namespace)
+      lockBinding(".ra_cr", namespace)
     }
   })
 })
