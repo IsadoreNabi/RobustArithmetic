@@ -1,4 +1,8 @@
-# CRAN comments — RobustArithmetic 0.1.1
+# CRAN comments — RobustArithmetic 0.2.0
+
+This is a resubmission. Version 0.1.1 did not pass the incoming pretest on
+Windows; 0.2.0 repairs the cause at its root and also carries the corrections
+of the check failures reported for 0.1.0.
 
 ## Test environments
 
@@ -9,113 +13,137 @@
 - local: Fedora Linux 44, R 4.6.1, x86_64-pc-linux-gnu, built with
   `--disable-long-double`, without Rmpfr, with unavailable suggested packages
   allowed
+- real platforms through GitHub Actions: the rhub workflow (16 platforms) and
+  a workflow of the package (11 platforms) that runs `R CMD check --as-cran` and
+  then checks correct rounding of the sixteen elementary functions against
+  Rmpfr on the same machine. The matrix ran on the commit of version 0.1.1 that
+  precedes this release, whose package sources differ from 0.2.0 only in the
+  `Version` field and `NEWS.md`. Platforms:
 
-All three configurations were checked from independently built 0.1.1 source
-tarballs on 2026-09-13, first in a local environment without network access and
-then in an environment with network access. Remote incoming checks were disabled
-for both three-configuration matrices so that their results were comparable;
-the network-enabled repetitions did not disable remote clock verification.
+  windows-2022 (R release)
+  windows-2022 (R devel)
+  windows-latest (R release)
+  macos-latest (R release)
+  macos-15 (R release)
+  macos-15 (R 4.5.2)
+  macos-15-intel (R release)
+  macos-15-intel (R 4.5.2)
+  ubuntu-latest (R release)
+  ubuntu-latest (R devel)
+  ubuntu-24.04-arm (R release)
+  windows (R-devel)
+  macos (R-devel)
+  macos-arm64 (R-devel)
+  m1-san (R-devel)
+  clang-asan
+  clang-ubsan
+  gcc-asan
+  valgrind
+  rchk
+  nold
+  nosuggests
+  intel
+  lto
+  c23
+  ubuntu-next
+  ubuntu-release
 
 ## R CMD check results
 
-### Three-configuration matrices
+### Local checks
 
 0 errors | 0 warnings | 0 notes
 
-All six checks returned `Status: OK`. In the network-enabled repetitions, the
-system R check completed in 48 seconds, the build without extended-precision
-long doubles with Rmpfr completed in 40 seconds, and the same build without
-Rmpfr and without required suggested packages completed in 36 seconds.
-
-In the no-network matrix, only the remote components of the incoming checks and
-the remote comparison of the system clock were disabled. Package installation,
-examples, tests, vignette rebuilding, and the PDF and HTML manual checks all ran
-and completed successfully in both matrices.
+All three local configurations returned `Status: OK`, with remote incoming
+checks disabled so that their results are comparable.
 
 ### Remote incoming feasibility check
 
 0 errors | 0 warnings | 1 note
 
-An additional check under the system R build, with network access, required
-suggested packages, and remote incoming checks enabled, completed in 59 seconds
-with `Status: 1 NOTE`. Its only note was:
+The system R build, with network access, required suggested packages and
+remote incoming checks enabled, returned `Status: 1 NOTE`. Its only note was
+(the timing in brackets, which varies between runs, is omitted):
 
 ```text
-* checking CRAN incoming feasibility ... [4s/15s] NOTE
+* checking CRAN incoming feasibility ... NOTE
 Maintainer: 'Jose Mauricio Gomez Julian <isadore.nabi@pm.me>'
 
-Days since last update: 1
+Days since last update: 3
 ```
 
-Version 0.1.1 corrects the check failures that CRAN reported for version 0.1.0
-on 2026-09-12. The one day since the last update therefore reflects the time
-between that report and this corrective release.
+The last published version is 0.1.0. This release corrects the check failures
+reported for it on 2026-09-12 and the cause of the Windows pretest failure of
+the 0.1.1 submission on 2026-09-14; 0.1.1 was never published.
 
-## Response to the check failures reported on 2026-09-12
+### Real platforms
 
-The reported checks exercised RobustArithmetic 0.1.0. Version 0.1.1 addresses
-the two causes represented in those logs.
+On the 26 platforms that run `R CMD check`, no check reported an ERROR or a
+WARNING, and the correct-rounding check against Rmpfr passed on every one of
+them, including the three Windows runners and the rhub Windows, valgrind,
+sanitizer, `nold` and `nosuggests` platforms. On `rchk` the analysis reported
+no counted error. The rhub checks returned `Status: OK`; on the 11 runners of
+the package workflow the only note named a file that the workflow itself wrote
+into the source directory before building, which is not part of the package
+and no longer happens.
 
-### Decimal endpoint containment
+## Response to the Windows pretest of version 0.1.1 (2026-09-14)
 
-The failures in `r-oldrel-macos-arm64`, `M1mac`, and `noLD` showed that a
-formatted lower endpoint could be read back by `as.numeric()` above the
-binary64 value it was intended to bound. The same conversion was used by the
-test and by the formatting implementation to infer which side of the exact
-decimal the parsed value occupied. On platforms where R has no
-extended-precision long double, intermediate rounding made that inference
-invalid and could produce printed bounds that did not contain the represented
-interval.
+Debian passed with the feasibility note only. Windows Server 2022 with R-devel
+ucrt ended the test suite with `[ FAIL 1 | WARN 186 | SKIP 26 | PASS 625 ]`; the
+error was in `test-newton.R`.
 
-Endpoint formatting now combines the exact decimal significand with an error
-bound derived from decimal scaling and accepts a side only when that bound
-certifies it. If a candidate cannot be certified, the formatter continues up
-to 18 significant digits; if it cannot prove both containment and one-step
-width, `format()` signals an internal error instead of printing a looser bound.
-The independent test reference, rather than the formatting engine, uses exact
-integer arithmetic to reconstruct the binary64 value from its hexadecimal
-representation before checking containment and one-step width. The 0.1.1
-source tarball returned `Status: OK` under the system R build and under the
-build without extended-precision long doubles, both with Rmpfr and without
-Rmpfr.
+The cause lies in the elementary functions R uses on Windows. In `R.dll` of
+R 4.6.1 and of R-devel, `tan`, `sinh`, `cosh`, `tanh`, `log10`, `asin`, `acos`
+and `atan` are imported from UCRT, while `exp`, `log`, `sin`, `cos`, `sqrt`,
+`expm1`, `log1p` and `log2` are compiled into `R.dll` from the mingw-w64
+library, which evaluates them with x87 extended-precision instructions. No
+published error bound exists for that route. At the first fast-level use, the
+package's audit measured `sin` and `cos` beyond the slack it had derived for
+other libraries and degraded the fast level for the session, as designed; each
+elementary operation then escalated to Rmpfr with a warning (the 186 warnings),
+and one test that hid Rmpfr to check provenance labels met the degraded level,
+which correctly refused to return an enclosure.
 
-### Environment-dependent `sin()` assertions
+The package no longer depends on that route. Its fast level evaluates fifteen
+elementary functions with correctly rounded CORE-MATH kernels compiled into
+the package and `sqrt` with the hardware square root, so correct rounding does
+not depend on the platform. The tests of the fast-level machinery no longer
+inherit the state of the machine, and a harness in the development tree runs
+the installed test suite in healthy and degraded states, with and without
+Rmpfr and with R built without long doubles.
 
-The failures in `r-oldrel-macos-arm64` and `r-oldrel-macos-x86_64` arose because
-two tests required the active `sin()` route to differ from the correctly
-rounded result. On those macOS configurations the route returned that result,
-so the tests had turned an observation about the environment that generated
-the sentinels into an unconditional package property.
+## Response to the check failures reported for 0.1.0 (2026-09-12)
 
-Those test assertions now apply only when the environment anchor supports the
-comparison. The anchor records `platform` in addition to the R version,
-just-in-time compilation level, and C math library, and
-`ra_environment_anchor()` returns the new field. An unidentified C math library
-or platform is treated as a mismatch. Consequently, on systems where `getconf`
-cannot identify the C library, including macOS and Windows, the package emits a
-different-environment startup message whenever it is attached with `library()`
-or `require()`, rather than when its namespace is merely loaded. The sentinel
-values, their published slack, the fast level, and the degradation rule are
-unchanged.
+- `r-oldrel-macos-arm64`, `M1mac` and `noLD`: a formatted lower endpoint could be
+  read back by `as.numeric()` above the value it bounded, because the formatter
+  inferred the side of the exact decimal through that conversion. `format()` now
+  certifies containment from the exact decimal significand and an error bound
+  and stops with an error rather than printing a looser bound.
+- `r-oldrel-macos-arm64` and `r-oldrel-macos-x86_64`: two tests required the
+  platform `sin()` to differ from the correctly rounded result, an observation
+  about one machine turned into a package property. The fast level now uses the
+  included correctly rounded kernels on every platform, the environment anchor
+  and `ra_environment_anchor()` are removed, and the state of the fast level is
+  reported by `ra_fast_level_status()`.
 
-### Results by reported configuration
+## Compiled code included in the package
 
-- `r-oldrel-macos-arm64`: the decimal containment repair addresses
-  `test-decimal.R`; the environment-dependent assertion repair addresses
-  `test-elementary.R` and `test-safeguards.R`.
-- `r-oldrel-macos-x86_64`: the environment-dependent assertion repair
-  addresses the failures in `test-elementary.R` and `test-safeguards.R`.
-- `M1mac`: the decimal containment repair addresses the failure in
-  `test-decimal.R`.
-- `noLD`: the decimal containment repair addresses the failure in
-  `test-decimal.R`; the repaired path was checked in a matching R build both
-  with Rmpfr and without Rmpfr.
+The package now contains C code:
 
-## Additional user-visible correction
+- fifteen binary64 kernels of CORE-MATH (<https://gitlab.inria.fr/core-math/core-math>,
+  commit 1ab68b70b90f807fd2bc9cf20ec295d49ae09592, MIT license), with local changes
+  limited to namespace isolation, portable warning-free compilation and taking
+  `fma` and `roundeven` from a header of the package;
+- that header, `src/ra_portable_math.h`, whose `fma` for compilers without the
+  FMA instruction is derived from musl (commit
+  9683bd62414604d3bd56cf6bd7be8f54aa31e7d3, MIT license), because the `fma` of
+  the Rtools45 toolchain is not correctly rounded and its library has no
+  `roundeven`.
 
-`ra_solve()` now derives each verdict's provenance from the evaluation that
-supports its certificate. Without Rmpfr, theorem-backed polynomial and
-rational verdicts remain `theorem`, while verdicts that depend on measured
-elementary-function bounds remain `measured`. Printed cards now use
-`verdict provenance`, and summaries use `Theorem provenance for every verdict`
-in place of `Rigorously verified`.
+Copyright holders, local changes and both license texts are in
+`inst/COPYRIGHTS`, referred to by the `Copyright` field; the authors of the
+included files are listed in `Authors@R` with role `cph`. The compiled code
+calls no `printf`, `abort`, `exit` or random number generator, and every C file
+compiles without warnings under GCC (C17 and C23) and Clang with
+`-Wall -Wextra -pedantic`.

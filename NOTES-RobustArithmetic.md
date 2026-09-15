@@ -1777,3 +1777,42 @@ a glibc en 66.388.387 casos con `-O2` y `-O0`); `O_IMPORT PASS` con diecinueve a
 bloque 5 del encargo, corridas después de la última edición de esta sección, cada una sobre su copia,
 con `ra-rhub-verify/borrador_r13/adjudicar_ra-coremath-portable_copias.sh`; sus salidas literales están
 en `~/TheBridge/LLMs_Exchange/ra-coremath-portable/evidencia/PARTE_MANUAL_SESION_07.md`.
+
+---
+
+## §17. El reenvío 0.2.0 y la segunda matriz de plataformas reales
+
+### §17.1. Lo que juzgó la segunda matriz
+
+El empuje de P1 a la rama de verificación (commit `a0f85bb`, versión 0.1.1) disparó las 27 plataformas:
+once corredores del flujo propio y dieciséis de R-hub. Con el sucesor O_MATRIX2 el juicio dio exactamente los
+dos rojos previstos antes de correrlo, los dos del trabajo `rchk`, y 240 comprobaciones en verde. Todo lo que
+depende del paquete pasó en las 27: chequeo sin ERROR ni WARNING, redondeo correcto de las dieciséis funciones
+contra Rmpfr en la misma máquina, e instalación silenciosa y sin degradar. Eso incluye los tres corredores de
+Windows y el de R-hub, donde la primera matriz no enlazaba, y `nosuggests`, `valgrind` y `gcc-asan`, que eran
+las otras tres fallas de entonces. P1 queda así confirmada en plataformas reales.
+
+Los dos defectos que la matriz mostró son del flujo de verificación y no del paquete. En `rchk` el contenedor
+no corre `R CMD check`: su guion instala sólo la biblioteca compilada (`R CMD INSTALL --libs-only
+--no-test-load`) y ninguna dependencia sugerida, de modo que los oráculos numéricos no pueden correr ahí; su
+análisis dio `Analyzed 291 functions` sin errores contados. En los once corredores propios apareció una NOTE
+«Non-standard file/directory found at top level: 'identity.txt'», porque el flujo escribía ese archivo en la
+raíz antes de construir el tarball. La unidad manual `ra-rhub-rchk` repara los dos: en `rchk` el paso sólo
+guarda la identidad y el reporte, y en el flujo propio la identidad se escribe después del chequeo.
+
+Al validar el sucesor con artefactos reales apareció un tercer defecto, latente en O_MATRIX desde su
+validación: R escribe el renglón «this is package» con `sQuote()`, que bajo una localización UTF-8 da comillas
+tipográficas, y el oráculo buscaba comillas rectas; ningún juicio real habría pasado. Sus 964 registros de
+prueba estaban escritos a mano con comillas rectas. O_MATRIX2 acepta las dos formas y escapa los puntos de la
+versión, y quedó validado con dos positivos y cinco negativos de una sola alteración cada uno.
+
+### §17.2. Los textos del reenvío
+
+`DESCRIPTION` pasa a `Version: 0.2.0`. `NEWS.md` tiene un único encabezado y describe la versión frente a 0.1.0,
+porque 0.1.1 nunca se publicó; lo juzga O_META2, sucesor de O_META, cuya lista de titulares escrita a mano no
+veía a musl. `cran-comments.md` responde al pretest de Windows con la medición de `R.dll`, a los fallos de
+0.1.0, a la nota de factibilidad (el chequeo remoto con red dio `Status: 1 NOTE`, sólo la de factibilidad, con
+«Days since last update: 3») y al código compilado incluido, y enumera las 27 plataformas con el resultado de
+la segunda matriz, cuyo código difiere de 0.2.0 sólo en la versión y en `NEWS.md`. El portón de la matriz
+sobre el commit que se envía no se cita en esos comentarios, que se escriben antes de que ese commit exista;
+es la condición para construir el tarball final.

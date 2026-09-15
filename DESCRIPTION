@@ -1,7 +1,7 @@
 Package: RobustArithmetic
 Type: Package
 Title: Verified Interval Arithmetic with Correctly Rounded Kernels
-Version: 0.1.1
+Version: 0.2.0
 Authors@R: c(
     person(given = "Jose Mauricio",
            family = "Gomez Julian",
