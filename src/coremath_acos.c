@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly-rounded arc cosine of binary64 value.
 
 Copyright (c) 2024-2025 Alexei Sibidanov.
@@ -39,42 +40,7 @@ SOFTWARE.
 
 /* STDC FENV_ACCESS is intentionally not requested in this vendored build. */
 
-/* __builtin_roundeven was introduced in gcc 10:
-   https://gcc.gnu.org/gcc-10/changes.html,
-   and in clang 17 */
-#if ((defined(__GNUC__) && __GNUC__ >= 10) || (defined(__clang__) && __clang_major__ >= 17)) && !defined(_MSC_VER) && (defined(__aarch64__) || defined(__x86_64__) || defined(__i386__))
-# define roundeven_finite(x) __builtin_roundeven (x)
-#else
-/* round x to nearest integer, breaking ties to even */
-static double
-roundeven_finite (double x)
-{
-  double ix;
-# if (defined(__GNUC__) || defined(__clang__)) && (defined(__AVX__) || defined(__SSE4_1__) || (__ARM_ARCH >= 8))
-#  if defined __AVX__
-   __asm__("vroundsd $0x8,%1,%1,%0":"=x"(ix):"x"(x));
-#  elif __ARM_ARCH >= 8
-   __asm__ ("frintn %d0, %d1":"=w"(ix):"w"(x));
-#  else /* __SSE4_1__ */
-   __asm__("roundsd $0x8,%1,%0":"=x"(ix):"x"(x));
-#  endif
-# else
-  ix = __builtin_round (x); /* nearest, away from 0 */
-  if (__builtin_fabs (ix - x) == 0.5)
-  {
-    /* if ix is odd, we should return ix-1 if x>0, and ix+1 if x<0 */
-    union { double f; uint64_t n; } u, v;
-    u.f = ix;
-    v.f = ix - __builtin_copysign (1.0, x);
-    /* Warning: v.n is 0 when x=0.5; while u.n cannot be zero since ix
-       is rounded away from zero. */
-    if (v.n == 0 || __builtin_ctzll (v.n) > __builtin_ctzll (u.n))
-      ix = v.f;
-  }
-# endif
-  return ix;
-}
-#endif
+#define roundeven_finite(x) ra_roundeven_finite (x)
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -116,7 +82,7 @@ static inline double sum(double xh, double xl, double ch, double cl, double *l){
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double ahhh = xh*ch;
-  *l = (xh*cl + xl*ch) + __builtin_fma(xh, ch, -ahhh);
+  *l = (xh*cl + xl*ch) + ra_fma(xh, ch, -ahhh);
   return ahhh;
 }
 
@@ -231,7 +197,7 @@ double ra_cr_acos (double x){
     t = 2 - 2*__builtin_fabs(x);
     jd = roundeven_finite(t*0x1p5);
     z = __builtin_copysign(__builtin_sqrt(t), x);
-    zl = __builtin_fma(z,z,-t)*((-0.5/t)*z);
+    zl = ra_fma(z,z,-t)*((-0.5/t)*z);
     t = 0.25*t - jd*0x1p-7;
     // fails with 0x1.8bp-52 for x=-0x1.3e827a2cd6d51p-1 (no FMA)
     eps = __builtin_fabs(z*t)*0x1.8cp-52 + 0x1p-105;
@@ -259,7 +225,7 @@ double ra_cr_acos (double x){
     // tables.
     t = x*x;
     jd = roundeven_finite(t*0x1p7);
-    t = __builtin_fma(x,x,-0x1p-7*jd);
+    t = ra_fma(x,x,-0x1p-7*jd);
     z = -x;
     zl = 0;
     // eps < 0 for x > 0, but the rounding test is still correct
@@ -294,7 +260,7 @@ double as_acos_refine(double x, double phi){
   // where the asin Taylor expansion works well:
   // acos(x) = asin(sqrt(1-x^2)) for x > 0
   // acos(x) = pi+asin(-sqrt(1-x^2)) for x < 0
-  double s2 = x*x, dx2 = __builtin_fma(x,x,-s2);
+  double s2 = x*x, dx2 = ra_fma(x,x,-s2);
   // s2+dx2 = x^2
   double c2l, c2h = fasttwosum(1.0,-s2,&c2l);
   c2l -= dx2;
@@ -305,7 +271,7 @@ double as_acos_refine(double x, double phi){
   /* let eps = ch^2-c2h, then c2h + c2l = ch^2 + c2l - eps,
      thus sqrt(c2h + c2l) = sqrt(ch^2*(1+(c2l-eps)/ch^2))
      ~ ch*(1 + (c2l-eps)/ch^2/2) = ch + (c2l-eps)/ch/2 */
-  double cl = (c2l - __builtin_fma(ch,ch,-c2h))*(0.5/ch);
+  double cl = (c2l - ra_fma(ch,ch,-c2h))*(0.5/ch);
   // now ch+cl approximates sqrt(1-x^2)
 
   int jf = roundeven_finite(__builtin_fabs(phi - 0x1.921fb54442d18p+0) * 0x1.45f306dc9c883p+4);
@@ -361,12 +327,12 @@ double as_acos_refine(double x, double phi){
   /* Remark: we could reduce magic to 0x1.8p-5, then Cs - Sc below would
      still be exact, but this would add one exceptional case
      (x=-0x1.52f06359672cdp-2) and save one, thus there is no benefit. */
-  double Sc = __builtin_fma(Sh, dch, MAGIC) - MAGIC;
-  double dSc = __builtin_fma(Sh, dch, -Sc);
+  double Sc = ra_fma(Sh, dch, MAGIC) - MAGIC;
+  double dSc = ra_fma(Sh, dch, -Sc);
   // Sc + dSc approximates Sh*dch, with Sc multiple of 2^-56 and |Sc| < 2^-5
 
-  double Cs = __builtin_fma(Ch, dsh, MAGIC) - MAGIC;
-  double dCs = __builtin_fma(Ch, dsh, -Cs);
+  double Cs = ra_fma(Ch, dsh, MAGIC) - MAGIC;
+  double dCs = ra_fma(Ch, dsh, -Cs);
   // Cs+dCs approximates Ch*dsh, with Cs multiple of 2^-56 and |Cs| < 2^-5
 
   double v = Cs - Sc; // exact since |Cs - Sc| multiple of 2^-56 and < 2^-4

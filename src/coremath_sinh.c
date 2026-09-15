@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded hyperbolic sine for binary64 values.
 
 Copyright (c) 2023-2026 Alexei Sibidanov and Paul Zimmermann.
@@ -51,13 +52,13 @@ static inline double fasttwosum(double x, double y, double *e){
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double h = xh*ch;
-  *l = __builtin_fma(xh,ch, -h) + xh*cl + xl*ch;
+  *l = ra_fma(xh,ch, -h) + xh*cl + xl*ch;
   return h;
 }
 
 static inline double mulddd(double xh, double xl, double ch, double *l){
   double h = xh*ch;
-  *l = __builtin_fma(xh,ch, -h) + xl*ch;
+  *l = ra_fma(xh,ch, -h) + xl*ch;
   return h;
 }
 
@@ -80,7 +81,7 @@ static double __attribute__((noinline)) as_exp_accurate(double x, double t, doub
     {0x1p+0, 0x1.6c16bd194535dp-94}, {0x1p-1, -0x1.8259d904fd34fp-93},
     {0x1.5555555555555p-3, 0x1.53e93e9f26e62p-57}};
   const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47, l2ll = 0x1.9ff0342542fc3p-102;
-  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + __builtin_fma(l2l,t,-dxl);
+  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + ra_fma(l2l,t,-dxl);
   double dxh = dx + dxl; dxl = ((dx - dxh) + dxl) + dxll;
   double fl = dxh*(0x1.5555555555555p-5 + dxh *(0x1.11111113e93e9p-7 + dxh *0x1.6c16c169400a7p-10));
   double fh = polydd(dxh,dxl,3,ch, &fl);
@@ -98,7 +99,7 @@ static double __attribute__((noinline)) as_sinh_zero(double x){
     {0x1.5555555555555p-3, 0x1.555555555552fp-57}, {0x1.1111111111111p-7, 0x1.11111115cf00dp-63},
     {0x1.a01a01a01a01ap-13, 0x1.a0011c925b85cp-73}, {0x1.71de3a556c734p-19, -0x1.b4e2835532bcdp-73},
     {0x1.ae64567f54482p-26, -0x1.defcf17a6ab79p-81}};
-  double x2 = x*x , x2l = __builtin_fma(x, x,-x2);
+  double x2 = x*x , x2l = ra_fma(x, x,-x2);
   double y2 = x2 * (0x1.6124613aef206p-33 + x2 * (0x1.ae7f36beea815p-41 + x2 * 0x1.95785063cd974p-49));
   double y1 = polydd(x2, x2l, 5, ch, &y2);
   y1 = mulddd(y1, y2, x, &y2);
@@ -269,7 +270,7 @@ double ra_cr_sinh(double x){
 
   const double s = 0x1.71547652b82fep+12;
   // 0x1.8000002p+26 = 0x1.8p26 + 0.5: round integer part of ax*s to nearest
-  double ax = __builtin_fabs(x), v0 = __builtin_fma(ax, s, 0x1.8000002p+26);
+  double ax = __builtin_fabs(x), v0 = ra_fma(ax, s, 0x1.8000002p+26);
   b64u64_u jt = {.f = v0};
 #if defined(__x86_64__)
   __m128d v = _mm_set_sd (v0);
@@ -294,7 +295,7 @@ double ra_cr_sinh(double x){
       if (x != 0 && __builtin_fabs (x) < 0x1p-1022)
         errno = ERANGE; // underflow
 #endif
-      return __builtin_fma(x,0x1p-55,x);
+      return ra_fma(x,0x1p-55,x);
     }
     /* With p = c[0]*x^3 + c[1]*x^5 + c[2]*x^7 + c[3]*x^9 + c[4]*x^11,
        q = x + p is a minimax approximation of sinh(x) on [x0,1/4] such that
@@ -325,7 +326,7 @@ double ra_cr_sinh(double x){
            sm = {.u = (u64)(1022 + je)<<52};
   double t0h = t0[i0][1], t0l = t0[i0][0];
   double t1h = t1[i1][1], t1l = t1[i1][0];
-  double th = t0h*t1h, tl = t0h*t1l + t1h*t0l + __builtin_fma(t0h,t1h,-th);
+  double th = t0h*t1h, tl = t0h*t1l + t1h*t0l + ra_fma(t0h,t1h,-th);
   const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47;
   double dx = (ax - l2h*t) + l2l*t, dx2 = dx*dx, mx = -dx;
   static const double ch[] = {0x1p+0, 0x1p-1, 0x1.5555555aaaaaep-3, 0x1.55555551c98cp-5};
@@ -375,7 +376,7 @@ double ra_cr_sinh(double x){
     } else { // 5 < |x| <= 31.4
       qh = q0h*q1h;
       double q0l = t0[j0][0], q1l = t1[j1][0];
-      double ql = q0h*q1l + q1h*q0l + __builtin_fma(q0h,q1h,-qh);
+      double ql = q0h*q1l + q1h*q0l + ra_fma(q0h,q1h,-qh);
       qh *= sm.f;
       ql *= sm.f;
       qh = as_exp_accurate(-ax,-t, qh, ql, &ql);
@@ -384,7 +385,7 @@ double ra_cr_sinh(double x){
   } else { // 0.25 <= |x| <= 5
     double q0h = t0[j0][1], q0l = t0[j0][0];
     double q1h = t1[j1][1], q1l = t1[j1][0];
-    double qh = q0h*q1h, ql = q0h*q1l + q1h*q0l + __builtin_fma(q0h,q1h,-qh);
+    double qh = q0h*q1h, ql = q0h*q1l + q1h*q0l + ra_fma(q0h,q1h,-qh);
     th *= sp.f;
     tl *= sp.f;
     qh *= sm.f;

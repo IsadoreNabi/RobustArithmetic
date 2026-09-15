@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded hyperbolic tangent function for binary64 values.
 
 Copyright (c) 2023-2026 Alexei Sibidanov, Cyprien Peignier, Paul Zimmermann
@@ -57,13 +58,13 @@ static inline double fasttwosub(double x, double y, double *e){
 }
 
 static inline double muldd_acc(double xh, double xl, double ch, double cl, double *l){
-  double plh = xl*ch, phl = xh*cl, phh = xh*ch, phh_rest = __builtin_fma(xh, ch, -phh);
+  double plh = xl*ch, phl = xh*cl, phh = xh*ch, phh_rest = ra_fma(xh, ch, -phh);
   phh_rest += (phl + plh);  
   return fasttwosum(phh, phh_rest, l);
 }
 
 static inline double mulddd_acc(double xh, double xl, double c, double *l){
-  double pl = xl*c, ph = xh*c, ph_rest = __builtin_fma(xh, c, -ph);
+  double pl = xl*c, ph = xh*c, ph_rest = ra_fma(xh, c, -ph);
   ph_rest += pl;
   return fasttwosum(ph, ph_rest, l);
 }
@@ -92,7 +93,7 @@ static double __attribute__((noinline)) as_exp_accurate(double x, double t, doub
     {0x1p+0, 0x1.6c16bd194535dp-94}, {0x1p-1, -0x1.8259d904fd34fp-93},
     {0x1.5555555555555p-3, 0x1.53e93e9f26e62p-57}};
   const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47, l2ll = 0x1.9ff0342542fc3p-102;
-  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + __builtin_fma(l2l,t,-dxl);
+  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + ra_fma(l2l,t,-dxl);
   double dxh = dx + dxl; dxl = ((dx - dxh) + dxl) + dxll;
   double fl = dxh*(0x1.5555555555555p-5 + dxh *(0x1.11111113e93e9p-7 + dxh *0x1.6c16c169400a7p-10));
   double fh = polydd(dxh,dxl,3,ch, &fl);
@@ -121,7 +122,7 @@ static double __attribute__((noinline)) as_tanh_zero(double x){ // |x|<0.25
         0x1.967e0a63ca836p-14,  -0x1.497b99d2a77d1p-15, 0x1.0ae346258cbdep-16,
         -0x1.aade68fb2f076p-18, 0x1.22e609bf8671fp-19,
     };
-    double x2 = x * x, x2l = __builtin_fma(x, x, -x2);
+    double x2 = x * x, x2l = ra_fma(x, x, -x2);
     double y2 = x2 * (cl[0] + x2 * (cl[1] + x2 * (cl[2] + x2 * (cl[3] + x2 * cl[4]))));
     double y1 = polydd(x2, x2l, 9, ch, &y2);
     y1 = mulddd_acc(y1, y2, x, &y2);
@@ -261,7 +262,7 @@ double ra_cr_tanh(double x){
     return f - df;
   }
   const double s = -0x1.71547652b82fep+13;
-  double v0 = __builtin_fma(ax, s, 0x1.8000004p+25);
+  double v0 = ra_fma(ax, s, 0x1.8000004p+25);
   b64u64_u jt = {.f = v0};
 #if defined(__x86_64__)
   __m128d v = _mm_set_sd (v0);
@@ -284,7 +285,7 @@ double ra_cr_tanh(double x){
 	  if(__builtin_expect(!aix, 0)) return x;
           /* We have underflow when 0 < |x| < 2^-1022 or when |x| = 2^-1022
              and rounding towards zero. */
-          double res = __builtin_fma (x, -0x1p-55, x);
+          double res = ra_fma (x, -0x1p-55, x);
 #ifdef CORE_MATH_SUPPORT_ERRNO
           if (__builtin_fabs (x) < 0x1p-1022 ||
               __builtin_fabs (res) < 0x1p-1022)
@@ -318,7 +319,7 @@ double ra_cr_tanh(double x){
     } // endif |x| < 0x1p-2
 
     double t0l = t0[i0][0], t1l = t1[i1][0];
-    tl = t0h*t1l + t1h*t0l + __builtin_fma(t0h, t1h,-th);
+    tl = t0h*t1l + t1h*t0l + ra_fma(t0h, t1h,-th);
     th *= sp.f;
     tl *= sp.f;
     const double l2h = -0x1.62e42ffp-14, l2l = -0x1.718432a1b0e26p-48;
@@ -331,7 +332,7 @@ double ra_cr_tanh(double x){
     double qh = rh, ql = rl, qd;
     qh = fasttwosum(1, qh, &qd); ql += qd;
 
-    double rqh = 1/qh, rql = (ql*rqh + __builtin_fma(rqh,qh,-1))*-rqh;
+    double rqh = 1/qh, rql = (ql*rqh + ra_fma(rqh,qh,-1))*-rqh;
     ph = muldd_acc(ph,pl, rqh,rql, &pl);
 
     /* This branch was tested exhaustively with/without fma contraction.
@@ -348,7 +349,7 @@ double ra_cr_tanh(double x){
   } // endif |x| ~< 3.683
   else { // 3.683 ~< x < 0x1.30fc1931f09cap+4
     static const double l2 = -0x1.62e42fefa39efp-14;
-    double dx = __builtin_fma(l2, t, -ax), dx2 = dx*dx;
+    double dx = ra_fma(l2, t, -ax), dx2 = dx*dx;
     double p = dx*((ch[0] + dx*ch[1]) + dx2*(ch[2] + dx*ch[3]));
     double rh = th*sp.f;
     rh += (p + ((2*0x1.3p-55)*ax))*rh;
@@ -365,14 +366,14 @@ double ra_cr_tanh(double x){
     if(lb == ub) return lb;
 
     double t0l = t0[i0][0], t1l = t1[i1][0];
-    tl = t0h*t1l + t1h*t0l + __builtin_fma(t0h, t1h,-th);
+    tl = t0h*t1l + t1h*t0l + ra_fma(t0h, t1h,-th);
     th *= sp.f;
     tl *= sp.f;
   }
   double rl, rh = as_exp_accurate(-2*ax, t, th, tl, &rl);
   double qd, qh = fasttwosum(1, rh, &qd), ql = rl + qd;
   qh = fasttwosum(qh, ql, &ql);
-  double rqh = 1/qh, rql = (ql*rqh + __builtin_fma(rqh,qh,-1))*-rqh;
+  double rqh = 1/qh, rql = (ql*rqh + ra_fma(rqh,qh,-1))*-rqh;
   double pl, ph = muldd_acc(rh,rl, rqh,rql, &pl);
   rh = fasttwosub(0.5, ph, &rl); rl -= pl;
   rh = fasttwosum(rh, rl, &rl);

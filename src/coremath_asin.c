@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly-rounded binary64 arcsine function.
 
 Copyright (c) 2022-2026 Alexei Sibidanov <sibid@uvic.ca>.
@@ -36,42 +37,7 @@ SOFTWARE.
 
 /* STDC FENV_ACCESS is intentionally not requested in this vendored build. */
 
-/* __builtin_roundeven was introduced in gcc 10:
-   https://gcc.gnu.org/gcc-10/changes.html,
-   and in clang 17 */
-#if ((defined(__GNUC__) && __GNUC__ >= 10) || (defined(__clang__) && __clang_major__ >= 17)) && !defined(_MSC_VER) && (defined(__aarch64__) || defined(__x86_64__) || defined(__i386__))
-# define roundeven_finite(x) __builtin_roundeven (x)
-#else
-/* round x to nearest integer, breaking ties to even */
-static double
-roundeven_finite (double x)
-{
-  double ix;
-# if (defined(__GNUC__) || defined(__clang__)) && (defined(__AVX__) || defined(__SSE4_1__) || (__ARM_ARCH >= 8))
-#  if defined __AVX__
-   __asm__("vroundsd $0x8,%1,%1,%0":"=x"(ix):"x"(x));
-#  elif __ARM_ARCH >= 8
-   __asm__ ("frintn %d0, %d1":"=w"(ix):"w"(x));
-#  else /* __SSE4_1__ */
-   __asm__("roundsd $0x8,%1,%0":"=x"(ix):"x"(x));
-#  endif
-# else
-  ix = __builtin_round (x); /* nearest, away from 0 */
-  if (__builtin_fabs (ix - x) == 0.5)
-  {
-    /* if ix is odd, we should return ix-1 if x>0, and ix+1 if x<0 */
-    union { double f; uint64_t n; } u, v;
-    u.f = ix;
-    v.f = ix - __builtin_copysign (1.0, x);
-    /* Warning: v.n is 0 when x=0.5; while u.n cannot be zero since ix
-       is rounded away from zero. */
-    if (v.n == 0 || __builtin_ctzll (v.n) > __builtin_ctzll (u.n))
-      ix = v.f;
-  }
-# endif
-  return ix;
-}
-#endif
+#define roundeven_finite(x) ra_roundeven_finite (x)
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -92,7 +58,7 @@ static inline double fastsum(double xh, double xl, double yh, double yl, double 
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double ahhh = ch*xh;
-  *l = (cl*xh + ch*xl) + __builtin_fma(ch, xh, -ahhh);
+  *l = (cl*xh + ch*xl) + ra_fma(ch, xh, -ahhh);
   return ahhh;
 }
 
@@ -209,7 +175,7 @@ double ra_cr_asin(double x){
     t = 2 - 2*__builtin_fabs(x);
     jd = roundeven_finite(t*0x1p5);
     z = __builtin_copysign(__builtin_sqrt(t), -x);
-    zl = __builtin_fma(z,z,-t)*((-0.5/t)*z);
+    zl = ra_fma(z,z,-t)*((-0.5/t)*z);
     t = 0.25*t - jd*0x1p-7;
     // fails with 0x1.98p-52 and x=0x1.3f47056fc030ap-1 (rndz, no fma)
     eps = __builtin_fabs(z*t)*0x1.99p-52;
@@ -219,13 +185,13 @@ double ra_cr_asin(double x){
 #ifdef CORE_MATH_SUPPORT_ERRNO
       if(__builtin_fabs(x) < 0x1p-1022 && x != 0.0) errno = ERANGE; // underflow
 #endif
-      return __builtin_fma(0x1p-55,x,x);
+      return ra_fma(0x1p-55,x,x);
     }
     f0h = 0;
     f0l = 0;
     t = x*x;
     jd = roundeven_finite(t*0x1p7);
-    t = __builtin_fma(x,x,-0x1p-7*jd);
+    t = ra_fma(x,x,-0x1p-7*jd);
     z = x;
     zl = 0;
     // fails for 0x1.0fp-52 with x=0x1.fa3c79a3c19abp-3 (rndz, no FMA)
@@ -248,7 +214,7 @@ double as_asin_refine(double x, double phi){
   // Consider x as sin(phi) then cos(phi) is ch + cl = sqrt(1-x^2)
   // Using angle rotation formula bring the argument close to zero
   // where the asin Taylor expansion works well.
-  double s2 = x*x, dx2 = __builtin_fma(x,x,-s2);
+  double s2 = x*x, dx2 = ra_fma(x,x,-s2);
   // s2+dx2 = x^2
   double c2l, c2h = fasttwosum(1.0,-s2,&c2l);
   c2l -= dx2;
@@ -259,7 +225,7 @@ double as_asin_refine(double x, double phi){
   /* let eps = ch^2-c2h, then c2h + c2l = ch^2 + c2l - eps,
      thus sqrt(c2h + c2l) = sqrt(ch^2*(1+(c2l-eps)/ch^2))
      ~ ch*(1 + (c2l-eps)/ch^2/2) = ch + (c2l-eps)/ch/2 */
-  double cl = (c2l - __builtin_fma(ch,ch,-c2h))*(0.5/ch);
+  double cl = (c2l - ra_fma(ch,ch,-c2h))*(0.5/ch);
   // now ch+cl approximates sqrt(1-x^2)
 
   int64_t jf = roundeven_finite(__builtin_fabs(phi) * 0x1.45f306dc9c883p+4);
@@ -293,11 +259,11 @@ double as_asin_refine(double x, double phi){
   double dch = ch - Ch, dcl = cl - Cl;
 
 #define MAGIC 0x1.8p-4
-  double Sc = __builtin_fma(Sh, dch, MAGIC) - MAGIC;
-  double dSc = __builtin_fma(Sh, dch, -Sc);
+  double Sc = ra_fma(Sh, dch, MAGIC) - MAGIC;
+  double dSc = ra_fma(Sh, dch, -Sc);
 
-  double Cs = __builtin_fma(Ch, dsh, MAGIC) - MAGIC;
-  double dCs = __builtin_fma(Ch, dsh, -Cs);
+  double Cs = ra_fma(Ch, dsh, MAGIC) - MAGIC;
+  double dCs = ra_fma(Ch, dsh, -Cs);
 
   double v = Cs - Sc;
   double dv =  (Ch*dsl + Cl*dsh) - (Sh*dcl + Sl*dch) - (dSc - dCs);

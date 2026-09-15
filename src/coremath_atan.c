@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly-rounded arctangent of binary64 value.
 
 Copyright (c) 2023 Alexei Sibidanov.
@@ -49,7 +50,7 @@ static inline double adddd(double xh, double xl, double ch, double cl, double *l
 }
 
 static inline double muldd_acc(double xh, double xl, double ch, double cl, double *l){
-  double ahlh = ch*xl, alhh = cl*xh, ahhh = ch*xh, ahhl = __builtin_fma(ch, xh, -ahhh);
+  double ahlh = ch*xl, alhh = cl*xh, ahhh = ch*xh, ahhl = ra_fma(ch, xh, -ahhh);
   ahhl += alhh + ahlh;
   return fasttwosum (ahhh, ahhl, l);
 }
@@ -165,14 +166,14 @@ static double __attribute__((cold,noinline)) as_atan_refine2(double x, double a)
   double h,hl;
   if(i==128) {
     h = -1.0/x;
-    hl = __builtin_fma(h,x,1)*h;
+    hl = ra_fma(h,x,1)*h;
   } else {
     double ta = __builtin_copysign(A[i][0], x);
-    double zta = x*ta, ztal = __builtin_fma(x, ta, -zta), zmta = x - ta;
+    double zta = x*ta, ztal = ra_fma(x, ta, -zta), zmta = x - ta;
     double v = 1 + zta, d = 1 - v, ev = (d + zta) - ((d + v) - 1) + ztal;
-    double r = 1.0/v, rl = (__builtin_fma(r, -v, 1.0) - ev*r)*r;
+    double r = 1.0/v, rl = (ra_fma(r, -v, 1.0) - ev*r)*r;
     h = r*zmta;
-    hl = __builtin_fma(r,zmta,-h) + rl*zmta;
+    hl = ra_fma(r,zmta,-h) + rl*zmta;
   }
   double h2l, h2 = muldd_acc(h, hl, h, hl, &h2l), h4 = h2*h2;
   double h3l, h3 = muldd_acc(h, hl, h2, h2l, &h3l);
@@ -237,7 +238,7 @@ double ra_cr_atan(double x){
     if (at<(u64)0x3e40000000000000ull) { // |x| < 0x1p-27
       /* We have underflow when 0 < |x| < 2^-1022 or when |x| = 2^-1022
          and rounding towards zero. */
-      double res = __builtin_fma (-0x1p-54, x, x);
+      double res = ra_fma (-0x1p-54, x, x);
 #ifdef CORE_MATH_SUPPORT_ERRNO
       if (__builtin_fabs (x) < 0x1p-1022 || __builtin_fabs (res) < 0x1p-1022)
         errno = ERANGE; // underflow
@@ -273,7 +274,7 @@ double ra_cr_atan(double x){
   }
   double h2 = h*h, h4 = h2*h2;
   double f = (ch[0] + h2*ch[1]) + h4*(ch[2] + h2*ch[3]);
-  al = __builtin_fma(h, f, al);
+  al = ra_fma(h, f, al);
   double e = h*0x3.fp-52;
   double ub = (al + e) + ah, lb = (al - e) + ah;
   if(__builtin_expect(ub == lb, 1)) return ub;

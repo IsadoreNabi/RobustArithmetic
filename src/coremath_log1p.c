@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded log(1+x) for binary64 values.
 
 Copyright (c) 2024-2025 Alexei Sibidanov.
@@ -32,42 +33,7 @@ SOFTWARE.
 
 /* STDC FENV_ACCESS is intentionally not requested in this vendored build. */
 
-/* __builtin_roundeven was introduced in gcc 10:
-   https://gcc.gnu.org/gcc-10/changes.html,
-   and in clang 17 */
-#if ((defined(__GNUC__) && __GNUC__ >= 10) || (defined(__clang__) && __clang_major__ >= 17)) && !defined(_MSC_VER) && (defined(__aarch64__) || defined(__x86_64__) || defined(__i386__))
-# define roundeven_finite(x) __builtin_roundeven (x)
-#else
-/* round x to nearest integer, breaking ties to even */
-static double
-roundeven_finite (double x)
-{
-  double ix;
-# if (defined(__GNUC__) || defined(__clang__)) && (defined(__AVX__) || defined(__SSE4_1__) || (__ARM_ARCH >= 8))
-#  if defined __AVX__
-   __asm__("vroundsd $0x8,%1,%1,%0":"=x"(ix):"x"(x));
-#  elif __ARM_ARCH >= 8
-   __asm__ ("frintn %d0, %d1":"=w"(ix):"w"(x));
-#  else /* __SSE4_1__ */
-   __asm__("roundsd $0x8,%1,%0":"=x"(ix):"x"(x));
-#  endif
-# else
-  ix = __builtin_round (x); /* nearest, away from 0 */
-  if (__builtin_fabs (ix - x) == 0.5)
-  {
-    /* if ix is odd, we should return ix-1 if x>0, and ix+1 if x<0 */
-    union { double f; uint64_t n; } u, v;
-    u.f = ix;
-    v.f = ix - __builtin_copysign (1.0, x);
-    /* Warning: v.n is 0 when x=0.5; while u.n cannot be zero since ix
-       is rounded away from zero. */
-    if (v.n == 0 || __builtin_ctzll (v.n) > __builtin_ctzll (u.n))
-      ix = v.f;
-  }
-# endif
-  return ix;
-}
-#endif
+#define roundeven_finite(x) ra_roundeven_finite (x)
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -100,13 +66,13 @@ static inline double sum(double xh, double xl, double ch, double cl, double *l){
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double ahhh = ch*xh;
-  *l = (cl*xh + ch*xl) + __builtin_fma(ch, xh, -ahhh);
+  *l = (cl*xh + ch*xl) + ra_fma(ch, xh, -ahhh);
   return ahhh;
 }
 
 static inline double mulddd(double x, double ch, double cl, double *l){
   double ahhh = ch*x;
-  *l = cl*x + __builtin_fma(ch, x, -ahhh);
+  *l = cl*x + ra_fma(ch, x, -ahhh);
   return ahhh;
 }
 
@@ -296,7 +262,7 @@ double ra_cr_log1p(double x){
       if(!ax) return x;
       /* we have underflow when |x| < 2^-1022, or when |x| = 2^-1022 and
          the result is smaller than 2^-1022 in absolute value */
-      double res = __builtin_fma(__builtin_fabs(x), -0x1p-54, x);
+      double res = ra_fma(__builtin_fabs(x), -0x1p-54, x);
 #ifdef CORE_MATH_SUPPORT_ERRNO
       if (__builtin_fabs (x) < 0x1p-1022 || __builtin_fabs (res) < 0x1p-1022)
         errno = ERANGE; // underflow
@@ -321,8 +287,8 @@ double ra_cr_log1p(double x){
 	 0x1.24924923f39ep-3, -0x1.fffffffe42e43p-4, 0x1.c71c75511d70bp-4, -0x1.99999de10510fp-4,
 	 0x1.7457e81b175f6p-4, -0x1.554fb43e54e0fp-4, 0x1.3ed68744f3d18p-4, -0x1.28558ad5a7ac4p-4};
       double x3 = x2*x, x4 = x2*x2, hx = -0.5*x;
-      ln1 = __builtin_fma(hx,x,x);
-      ln0 = __builtin_fma(hx,x,x-ln1);
+      ln1 = ra_fma(hx,x,x);
+      ln0 = ra_fma(hx,x,x-ln1);
       double f = ((c[0]+x*c[1])+x2*(c[2]+x*c[3])) +
 	x4*(((c[4]+x*c[5])+x2*(c[6]+x*c[7])) + x4*((c[8]+x*c[9])+x2*(c[10]+x*c[11])));
       ln0 += x3*f;
@@ -377,7 +343,7 @@ double ra_cr_log1p(double x){
       t.f *= sc[je-1022];
       dt.f *= sc[je-1022];
     }
-    double dh = rs.f*t.f, dl = __builtin_fma(rs.f,t.f,-dh) + rs.f*dt.f;
+    double dh = rs.f*t.f, dl = ra_fma(rs.f,t.f,-dh) + rs.f*dt.f;
     double xl, xh = fasttwosum(dh-1.0, dl, &xl), x2 = xh*xh;
     xl += x2*((c[0] + xh*c[1]) + x2*((c[2] + xh*c[3]) + x2*(c[4] + xh*c[5])));
     double L1 = 0x1.62e42fefa4p-1*je, L0 = -0x1.8432a1b0e2634p-43*je;
@@ -414,9 +380,9 @@ static double __attribute__((noinline)) as_log1p_refine(double x, double a){
   if(ax<0x7ea0000000000000ull){
     if(ax<0x7940000000000000ull){
       if(!ax) return x;
-      return __builtin_fma(__builtin_fabs(x), -0x1p-54, x);
+      return ra_fma(__builtin_fabs(x), -0x1p-54, x);
     }
-    double x2h = x*x, x2l = __builtin_fma(x,x,-x2h);
+    double x2h = x*x, x2l = ra_fma(x,x,-x2h);
     double x3l, x3h = mulddd(x,x2h, x2l, &x3l);
     double sl = x*((czl[0] + x*czl[1]) + x2h*(czl[2] + x*czl[3]));
     double sh = polyddd(x, 5,cz, &sl);
@@ -448,14 +414,14 @@ static double __attribute__((noinline)) as_log1p_refine(double x, double a){
     t.u -= (u64)je<<52;
 
     double t12 = rt[0][j1]*rt[1][j2], t34 = rt[2][j3]*rt[3][j4];
-    double th = t12*t34, tl = __builtin_fma(t12,t34,-th);
-    double dh = th*t.f, dl = __builtin_fma(th,t.f,-dh);
-    double sh = tl*t.f, sl = __builtin_fma(tl,t.f,-sh);
+    double th = t12*t34, tl = ra_fma(t12,t34,-th);
+    double dh = th*t.f, dl = ra_fma(th,t.f,-dh);
+    double sh = tl*t.f, sl = ra_fma(tl,t.f,-sh);
     double xl, xh = fasttwosum(dh-1, dl, &xl);
     xh = fastsum(xh, xl, sh, sl, &xl);
     if(dt.u){
       dt.u -= (u64)je<<52;
-      double ddh = th*dt.f, ddl = __builtin_fma(th,dt.f,-ddh) + tl*dt.f;
+      double ddh = th*dt.f, ddl = ra_fma(th,dt.f,-ddh) + tl*dt.f;
       xh = fastsum(xh, xl, ddh, ddl, &xl);
     }
     sl = xh*((cl[0] + xh*cl[1]) + (xh*xh)*(cl[2] + xh*cl[3]));

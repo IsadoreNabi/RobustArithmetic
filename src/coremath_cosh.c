@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded hyperbolic cosine for binary64 values.
 
 Copyright (c) 2023-2025 Alexei Sibidanov <sibid@uvic.ca>
@@ -47,7 +48,7 @@ static inline double fasttwosum(double x, double y, double *e){
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double h = ch*xh;
-  *l = __builtin_fma(ch,xh, -h) + xh*cl + ch*xl;
+  *l = ra_fma(ch,xh, -h) + xh*cl + ch*xl;
   return h;
 }
 
@@ -70,7 +71,7 @@ static double __attribute__((cold,noinline)) as_exp_accurate(double x, double t,
     {0x1p+0, 0x1.6c16bd194535dp-94}, {0x1p-1, -0x1.8259d904fd34fp-93},
     {0x1.5555555555555p-3, 0x1.53e93e9f26e62p-57}};
   const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47, l2ll = 0x1.9ff0342542fc3p-102;
-  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + __builtin_fma(l2l,t,-dxl);
+  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + ra_fma(l2l,t,-dxl);
   double dxh = dx + dxl; dxl = ((dx - dxh) + dxl) + dxll;
   double fl = dxh*(0x1.5555555555555p-5 + dxh *(0x1.11111113e93e9p-7 + dxh *0x1.6c16c169400a7p-10));
   double fh = polydd(dxh,dxl,3,ch, &fl);
@@ -93,7 +94,7 @@ static double __attribute__((noinline)) as_cosh_zero(double x){
                               0x1.1eed8eff9089cp-29, // degree 12
                               0x1.939749ce13dadp-37, // degree 14
                               0x1.ae9891efb6691p-45}; // degree 16
-  double x2 = x*x , x2l = __builtin_fma(x, x,-x2);
+  double x2 = x*x , x2l = ra_fma(x, x,-x2);
   double y2 = x2 * (cl[0] + x2 * (cl[1] + x2 * (cl[2] + x2 * cl[3])));
   double y1 = polydd(x2, x2l, 4, ch, &y2);
   y1 = muldd(y1, y2, x2, x2l, &y2);
@@ -233,7 +234,7 @@ double ra_cr_cosh(double x){
   };
 
   const double s = 0x1.71547652b82fep+12;
-  double ax = __builtin_fabs(x), v0 = __builtin_fma(ax, s, 0x1.8000002p+26);
+  double ax = __builtin_fabs(x), v0 = ra_fma(ax, s, 0x1.8000002p+26);
   b64u64_u jt = {.f = v0};
 #if defined(__x86_64__)
   __m128d v = _mm_set_sd (v0);
@@ -250,7 +251,7 @@ double ra_cr_cosh(double x){
   u64 aix = ix.u;
   if(__builtin_expect(aix<0x3fc0000000000000ull, 0)){ // |x| < 0.125
     if(__builtin_expect(aix<0x3e50000000000000ull, 0)) // |x| < 0x1p-26
-      return __builtin_fma(ax,0x1p-55,1);
+      return ra_fma(ax,0x1p-55,1);
     /* q(x) = 1 + c0*x^2 + c1*x^4 + c2*x^6 + c3*x^8 + c4*x^10 is a degree-10
        polynomial approximating cosh(x) on [2^-26, 0.125] such that:
        |q(x) - cosh(x)| < 2^-67.518 * x^2.
@@ -290,7 +291,7 @@ double ra_cr_cosh(double x){
            sm = {.u = (uint64_t)(1022 + je)<<52};
   double t0h = t0[i0][1], t0l = t0[i0][0];
   double t1h = t1[i1][1], t1l = t1[i1][0];
-  double th = t0h*t1h, tl = t0h*t1l + t1h*t0l + __builtin_fma(t0h,t1h,-th);
+  double th = t0h*t1h, tl = t0h*t1l + t1h*t0l + ra_fma(t0h,t1h,-th);
   const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47;
   double dx = (ax - l2h*t) + l2l*t, dx2 = dx*dx, mx = -dx;
   static const double ch[] = {0x1p+0, 0x1p-1, 0x1.5555555aaaaaep-3, 0x1.55555551c98cp-5};
@@ -337,7 +338,7 @@ double ra_cr_cosh(double x){
     } else {
       qh = q0h*q1h;
       double q0l = t0[j0][0], q1l = t1[j1][0];
-      double ql = q0h*q1l + q1h*q0l + __builtin_fma(q0h,q1h,-qh);
+      double ql = q0h*q1l + q1h*q0l + ra_fma(q0h,q1h,-qh);
       qh *= sm.f;
       ql *= sm.f;
       qh = as_exp_accurate(-ax,-t, qh, ql, &ql);
@@ -346,7 +347,7 @@ double ra_cr_cosh(double x){
   } else { // |x| <= 5
     double q0h = t0[j0][1], q0l = t0[j0][0];
     double q1h = t1[j1][1], q1l = t1[j1][0];
-    double qh = q0h*q1h, ql = q0h*q1l + q1h*q0l + __builtin_fma(q0h,q1h,-qh);
+    double qh = q0h*q1h, ql = q0h*q1l + q1h*q0l + ra_fma(q0h,q1h,-qh);
     th *= sp.f;
     tl *= sp.f;
     qh *= sm.f;

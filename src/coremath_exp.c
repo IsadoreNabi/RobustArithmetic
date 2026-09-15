@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded exponential function for binary64 values.
 
 Copyright (c) 2022-2025 Alexei Sibidanov.
@@ -36,42 +37,7 @@ SOFTWARE.
 
 /* STDC FENV_ACCESS is intentionally not requested in this vendored build. */
 
-/* __builtin_roundeven was introduced in gcc 10:
-   https://gcc.gnu.org/gcc-10/changes.html,
-   and in clang 17 */
-#if ((defined(__GNUC__) && __GNUC__ >= 10) || (defined(__clang__) && __clang_major__ >= 17)) && !defined(_MSC_VER) && (defined(__aarch64__) || defined(__x86_64__) || defined(__i386__))
-# define roundeven_finite(x) __builtin_roundeven (x)
-#else
-/* round x to nearest integer, breaking ties to even */
-static double
-roundeven_finite (double x)
-{
-  double ix;
-# if (defined(__GNUC__) || defined(__clang__)) && (defined(__AVX__) || defined(__SSE4_1__) || (__ARM_ARCH >= 8))
-#  if defined __AVX__
-   __asm__("vroundsd $0x8,%1,%1,%0":"=x"(ix):"x"(x));
-#  elif __ARM_ARCH >= 8
-   __asm__ ("frintn %d0, %d1":"=w"(ix):"w"(x));
-#  else /* __SSE4_1__ */
-   __asm__("roundsd $0x8,%1,%0":"=x"(ix):"x"(x));
-#  endif
-# else
-  ix = __builtin_round (x); /* nearest, away from 0 */
-  if (__builtin_fabs (ix - x) == 0.5)
-  {
-    /* if ix is odd, we should return ix-1 if x>0, and ix+1 if x<0 */
-    union { double f; uint64_t n; } u, v;
-    u.f = ix;
-    v.f = ix - __builtin_copysign (1.0, x);
-    /* Warning: v.n is 0 when x=0.5; while u.n cannot be zero since ix
-       is rounded away from zero. */
-    if (v.n == 0 || __builtin_ctzll (v.n) > __builtin_ctzll (u.n))
-      ix = v.f;
-  }
-# endif
-  return ix;
-}
-#endif
+#define roundeven_finite(x) ra_roundeven_finite (x)
 
 typedef int64_t i64;
 typedef uint64_t u64;
@@ -91,7 +57,7 @@ static inline double fastsum(double xh, double xl, double yh, double yl, double 
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double ahhh = ch*xh;
-  *l = (ch*xl + cl*xh) + __builtin_fma(ch, xh, -ahhh);
+  *l = (ch*xl + cl*xh) + ra_fma(ch, xh, -ahhh);
   return ahhh;
 }
 
@@ -109,8 +75,8 @@ static inline double muldd(double xh, double xl, double ch, double cl, double *l
    Without FMA contraction: 129.6 cycles -> 192.2 cycles
 
    To mitigate this slowdown, with respect to the original Algorithm,
-   we replaced g = __builtin_fma (ah, bl, f) below by g = ah * bl + f,
-   and *l = __builtin_fma (al, bh, g) by *l = al * bh + g. If an FMA is
+   we replaced g = ra_fma (ah, bl, f) below by g = ah * bl + f,
+   and *l = ra_fma (al, bh, g) by *l = al * bh + g. If an FMA is
    available in hardware, g = ah * bl + f is compiled using an FMA;
    otherwise, it is compiled as a multiplication and an addition.
    This yields:
@@ -122,13 +88,13 @@ static inline double
 FastFMA_DW (double ah, double al, double bh, double bl, double ch, double cl,
             double *l)
 {
-  double dh = __builtin_fma (ah, bh, ch);
+  double dh = ra_fma (ah, bh, ch);
   double t = ch - dh;
-  double e = __builtin_fma (ah, bh, t);
+  double e = ra_fma (ah, bh, t);
   double f = e + cl;
-  // double g = __builtin_fma (ah, bl, f); // original algorithm
+  // double g = ra_fma (ah, bl, f); // original algorithm
   double g = ah * bl + f;
-  // *l = __builtin_fma (al, bh, g); // original algorithm
+  // *l = ra_fma (al, bh, g); // original algorithm
   *l = al * bh + g;
   // *l is dl in the paper
   return dh;
@@ -312,7 +278,7 @@ static double __attribute__((cold,noinline)) as_exp_accurate(double x){
   /* Use Cody-Waite argument reduction: since |x| < 745, we have |t| < 2^23,
      thus since l2h is exactly representable on 29 bits, l2h*t is exact. */
   const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47, l2ll = 0x1.9ff0342542fc3p-102;
-  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + __builtin_fma(l2l,t,-dxl);
+  double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + ra_fma(l2l,t,-dxl);
   double dxh = dx + dxl; dxl = (dx - dxh) + dxl + dxll;
   double fl, fh = opolydd(dxh,dxl, 7,ch, &fl);
   fh = muldd(dxh,dxl, fh,fl, &fl);

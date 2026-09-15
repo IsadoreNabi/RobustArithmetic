@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded logarithm of binary64 values.
 
 Copyright (c) 2022 INRIA and CERN.
@@ -526,18 +527,18 @@ ra_cr_log_fast (double *h, double *l, int e, d64u64 v)
   double r = _INVERSE[i-OFFSET];
   double l1 = _LOG_INV[i-OFFSET][0];
   double l2 = _LOG_INV[i-OFFSET][1];
-  double z = __builtin_fma (r, y, -1.0); /* exact */
+  double z = ra_fma (r, y, -1.0); /* exact */
   /* evaluate P(z), for |z| < 0.00212097167968735 */
   double ph; /* will hold the value of P(z)-z */
   double z2 = z * z; /* |z2| < 4.5e-6 thus the rounding error on z2 is
                         bounded by ulp(4.5e-6) = 2^-70. */
-  double p45 = __builtin_fma (P[5], z, P[4]);
+  double p45 = ra_fma (P[5], z, P[4]);
   /* |P[5]| < 0.167, |z| < 0.0022, |P[4]| < 0.21 thus |p45| < 0.22:
      the rounding (and total) error on p45 is bounded by ulp(0.22) = 2^-55 */
-  double p23 = __builtin_fma (P[3], z, P[2]);
+  double p23 = ra_fma (P[3], z, P[2]);
   /* |P[3]| < 0.26, |z| < 0.0022, |P[2]| < 0.34 thus |p23| < 0.35:
      the rounding (and total) error on p23 is bounded by ulp(0.35) = 2^-54 */
-  ph = __builtin_fma (p45, z2, p23);
+  ph = ra_fma (p45, z2, p23);
   /* |p45| < 0.22, |z2| < 4.5e-6, |p23| < 0.35 thus |ph| < 0.36:
      the rounding error on ph is bounded by ulp(0.36) = 2^-54.
      Adding the error on p45 multiplied by z2, that on z2 multiplied by p45,
@@ -545,7 +546,7 @@ ra_cr_log_fast (double *h, double *l, int e, d64u64 v)
      on ph the following bound:
      2^-54 + err(p45)*4.5e-6 + 0.22*err(z2) + err(p23) <
      2^-54 + 2^-55*4.5e-6 + 0.22*2^-70 + 2^-54 < 2^-52.99 */
-  ph = __builtin_fma (ph, z, P[1]);
+  ph = ra_fma (ph, z, P[1]);
   /* let ph0 be the value at input, and ph1 the value at output:
      |ph0| < 0.36, |z| < 0.0022, |P[1]| < 0.5 thus |ph1| < 0.501:
      the rounding error on ph1 is bounded by ulp(0.501) = 2^-53.
@@ -575,7 +576,7 @@ ra_cr_log_fast (double *h, double *l, int e, d64u64 v)
      representable. */
 
   double ee = e;
-  fast_two_sum (h, l, __builtin_fma (ee, log2_h, l1), z);
+  fast_two_sum (h, l, ra_fma (ee, log2_h, l1), z);
   /* here |hh+l1|+|z| <= 3275606777621385*2^-42 + 0.0022 < 745
      thus |h| < 745, and the additional error from the fast_two_sum() call is
      bounded by 2^-105*745 < 2^-95.4. */
@@ -588,7 +589,7 @@ ra_cr_log_fast (double *h, double *l, int e, d64u64 v)
      error on ph + ... is bounded by ulp(2^-18.7) = 2^-71, which yields a
      cumulated error bound of 2^-71 + 2^-95 < 2^-70.99. */
 
-  *l = __builtin_fma (ee, log2_l, *l);
+  *l = ra_fma (ee, log2_l, *l);
   /* let l_in be the input value of *l, and l_out the output value.
      We have |l_in| < 2^-18.7 (from above)
      and |e*log2_l| <= 1074*0x1.ef35793c7673p-45
@@ -602,7 +603,7 @@ ra_cr_log_fast (double *h, double *l, int e, d64u64 v)
      2^-69.32 from the rounding errors in the polynomial evaluation
      2^-95.4 from the fast_two_sum call
      2^-70.99 from the *l = ph + (*l + l2) instruction
-     2^-71 from the last __builtin_fma call.
+     2^-71 from the last ra_fma call.
      This gives an absolute error bounded by < 2^-68.22.
   */
 

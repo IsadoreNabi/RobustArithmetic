@@ -65,11 +65,16 @@ while IFS=$'\t' read -r repo_path upstream_path; do
       ;;
     *.c)
       tar xOzf "$archive" "${archive_root}${upstream_path}" |
-        sed -e '/^\/\/ Warning: clang also defines __GNUC__$/,/^#endif$/d' \
+        sed -e '1i\
+#include "ra_portable_math.h"' \
+            -e '/^\/\/ Warning: clang also defines __GNUC__$/,/^#endif$/d' \
             -e 's/^#pragma STDC FENV_ACCESS ON$/\/\* STDC FENV_ACCESS is intentionally not requested in this vendored build. \*\//' \
             -e 's/^typedef unsigned _BitInt(128) u128;$/__extension__ typedef unsigned _BitInt(128) u128;/' \
             -e "s/cr_${function_name}/ra_cr_${function_name}/g" \
             -e "s/#include \"dint.h\"/#include \"coremath_${function_name}_dint.h\"/" \
+            -e 's/__builtin_fma/ra_fma/g' \
+            -e '/^\/\* __builtin_roundeven was introduced in gcc 10:$/,/^#endif$/c\
+#define roundeven_finite(x) ra_roundeven_finite (x)' \
         > "$destination"
       ;;
     *) printf 'unsupported manifest entry: %s\n' "$upstream_path" >&2; exit 2 ;;

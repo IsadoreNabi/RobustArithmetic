@@ -1625,3 +1625,155 @@ tres chequeos naturales terminen en `Status: OK`; que ninguna prueba ni archivo 
 `RA_SCENARIO`; y que esta sección exista una sola vez. Los oráculos adicionales del arnés comprueban
 por separado que los seis escenarios de raíz están presentes, que las cuatro suites instaladas
 terminan sin fallos y que ningún bloque ejecutado del manifiesto sellado se pierde bajo degradación.
+
+---
+
+## §16. El redondeo correcto deja de depender de la biblioteca matemática de la plataforma
+
+Los quince núcleos de CORE-MATH redondean correctamente sólo si `fma(x, y, z)` devuelve `x*y + z`
+correctamente redondeado y si `roundeven` redondea al entero par. Cuando el compilador no puede
+traducirlas a una instrucción, `__builtin_fma` y `__builtin_roundeven` se vuelven llamadas a la
+biblioteca matemática de la plataforma, y por eso la exactitud del paquete quedaba apoyada en una
+biblioteca que nadie había medido fuera de glibc. Esta unidad hace que ninguna de las dos operaciones
+salga de esa biblioteca, corrige `VignetteBuilder` y saca de la suite una fuga de memoria de Rmpfr.
+No cambian la holgura, la procedencia `measured`, el nivel riguroso, las salvaguardas ni el algoritmo
+de CORE-MATH.
+
+### §16.1. Lo que midió el diagnóstico
+
+La primera matriz de plataformas reales (revisión `1df6a06`, 2026-09-14) mostró que el paquete no
+enlaza en Windows: `undefined reference to 'roundeven'`, porque cinco núcleos (exp, expm1, log1p, asin
+y acos) usan `__builtin_roundeven` y en x86_64 sin SSE4.1 el compilador emite una llamada que la
+biblioteca de mingw-w64 de Rtools45 no resuelve. Al acotar esa reparación apareció un defecto mayor en
+la misma capa. Compilados sin la instrucción FMA para `x86_64-windows-gnu` y `x86_64-linux-gnu`, los
+quince objetos dejan `fma` sin resolver y cinco dejan `roundeven`; en `aarch64-linux-gnu` las dos se
+traducen en línea. El objeto `fma` del `libmingwex.a` real de Rtools45 (mingw-w64 11.0.1), enlazado con
+zig y ejecutado con wine, difiere de la instrucción FMA en 181.535 de 2.000.000 de ternas al azar,
+183.512 de cancelación, 459.717 con sumando pequeño y 675.948 cerca de lo subnormal, es decir entre el 9
+y el 34 por ciento según la clase; la fuente 11.0.1 compilada aquí da las mismas proporciones sobre
+20.000.000 por clase, y su propio comentario admite «a 1-ULP error». Aunque `roundeven` enlazara,
+CORE-MATH en Windows no redondearía correctamente. El `floor` de ese mismo archivo coincide con un
+`floor` exacto por bits en 59.985.345 casos, `sqrt` se traduce a la instrucción y sólo llama al sistema
+con argumentos negativos, y `fegetround` consulta un estado, de modo que ninguno de los tres es causa.
+
+Queda sin establecer qué `fma` resuelve el enlazador real de Rtools45 cuando la biblioteca universal de
+C también lo exporta, si ése es exacto, y con qué banderas compilan los compiladores de CRAN en macOS
+Intel. La reparación no depende de ninguna de esas respuestas, y la segunda matriz mide esos sistemas
+reales. Mediciones y fuentes con sus SHA-256 en
+`~/TheBridge/LLMs_Exchange/ra-rhub-verify/evidencia/matriz_1df6a06/` (`DIAGNOSTICO.md`, `sondas_d1/`,
+`CONSTANCIAS_ASISTENTE.md`).
+
+### §16.2. El diseño y las alternativas descartadas
+
+`src/ra_portable_math.h` es código del paquete. Define `ra_roundeven_finite()` por manipulación de los
+bits de binary64 en toda plataforma, sin llamadas; coincide con el `roundeven` de glibc en 66.388.387
+casos con `-O2` y `-O0`, incluidos todos los exponentes, los empates y los bordes de acarreo. Define
+`ra_fma` como `__builtin_fma` sólo donde el compilador garantiza la instrucción
+(`__FMA__`, `__aarch64__` o `_M_ARM64`), y en todo otro caso como el `fma` de musl del commit
+`9683bd62414604d3bd56cf6bd7be8f54aa31e7d3`, que forma el resultado exacto con aritmética entera de 64
+bits y redondea una sola vez. La parte de musl va entre dos renglones marcadores y es la fuente fijada
+en `dev/musl/fma.c` con siete clases de cambios locales y ninguna otra: sin sus cuatro inclusiones,
+nombres locales con prefijo, funciones `static inline` con el punto de entrada llamado `ra_fma`, sin la
+pragma del entorno de coma flotante (como en los archivos de CORE-MATH), `__builtin_clzll` en lugar del
+auxiliar de musl, el escalado final por `ra_fma_scale` y seis conteos de desplazamiento entre paréntesis,
+que `-Wparentheses` exige y que no alteran el orden de evaluación. El encabezado incluye `<math.h>` sólo
+por el tipo `double_t`.
+
+El escalado reemplaza a la función de biblioteca que musl llama al final. `ra_fma_pow2(e)` construye
+2^e desde su patrón de bits, y `ra_fma_scale(r, e)` distingue tres regímenes sobre los valores que musl
+le pasa, que son enteros binarios no nulos con a lo sumo 53 bits significativos más un bit pegajoso:
+para −1022 ≤ e ≤ 1023 la potencia es exacta y el único producto redondea; para e > 1023 el resultado
+exacto desborda y el primer producto ya da el infinito con signo; para e < −1022 el primer producto por
+2^−1022 es exacto porque |r| ≥ 1 y el segundo redondea, y acotar el exponente en −1074 no cambia ningún
+resultado, porque por debajo el valor exacto queda muy lejos de la mitad del subnormal mínimo. Los
+extremos de esos regímenes, con sus ocho signos, son 96 casos del oráculo de exactitud.
+
+`dev/core-math/import.sh` sigue generando los quince núcleos desde el archivo sellado, con tres
+sustituciones nuevas: `#include "ra_portable_math.h"` como primera línea, `__builtin_fma` por `ra_fma`,
+y el bloque de 36 líneas que elige la definición de `roundeven_finite` según el compilador reemplazado
+por `#define roundeven_finite(x) ra_roundeven_finite (x)` en los cinco núcleos que lo tienen. La
+inclusión va en la primera línea porque en asin, log2 y log10 la primera inclusión del original está
+dentro de `#ifdef CORE_MATH_SUPPORT_ERRNO`, y ponerla antes de ella dejaba esos tres núcleos sin
+compilar; ponerla antes de la primera directiva también funciona en los quince, pero depende de que
+ninguna directiva aparezca dentro de un comentario. En el guion, la inserción es la primera expresión
+del `sed`, de modo que no depende del contenido del primer renglón del original.
+
+`inst/COPYRIGHTS` suma una sección de musl con el encabezado, el commit, el archivo de origen, los
+cambios locales, el aviso colectivo «Copyright © 2005-2020 Rich Felker, et al.» y la licencia MIT
+literal de musl, y agrega las sustituciones nuevas a los cambios locales de las quince entradas de
+CORE-MATH (las tres en los cinco núcleos con el bloque, dos en los otros diez, donde el bloque no
+existe). `Authors@R` suma a Szabolcs Nagy como contribuyente y titular: el historial del archivo en el
+repositorio de musl, consultado el 2026-09-15 en
+`https://git.musl-libc.org/cgit/musl/log/src/math/fma.c` y en la página del commit fijado, muestra que
+el contenido vigente es su reescritura del 2017-10-13 («math: rewrite fma with mostly int arithmetics»)
+con su corrección del 2024-03-14 («math: fix fma(x,y,0) when x*y rounds to -0»), que es el commit
+fijado, con una línea cambiada. Rich Felker no se agrega como titular porque no escribió ese archivo; su
+aviso colectivo va literal en `inst/COPYRIGHTS`, que el campo `Copyright:` ya referencia.
+`VignetteBuilder` pasa a `knitr, rmarkdown`, porque «Writing R Extensions» exige los dos paquetes en
+ese campo cuando el motor es `knitr::rmarkdown`; el contenedor sin sugeridos de la primera matriz falló
+por esa omisión, aunque la emulación local con `_R_CHECK_DEPENDS_ONLY_=true` había dado `Status: OK`.
+
+Alternativas descartadas. La selección en tiempo de ejecución con dos copias compiladas, una con
+`target("fma")`, y `__builtin_cpu_supports` iguala la exactitud y recupera velocidad, pero duplica el
+código objeto, depende de atributos cuyo soporte difiere entre GCC, Clang, mingw y macOS y exige
+verificar las dos rutas con construcciones forzadas; queda como mejora de rendimiento posible. Usar el
+`fma` del sistema salvo en Windows deja la exactitud apoyada en bibliotecas cuya corrección no está
+establecida fuera de glibc, contra la razón de la decisión D4. Usar la instrucción de `roundeven` donde
+se traduce en línea agrega una segunda ruta sin necesidad de velocidad.
+
+### §16.3. El costo medido en tiempo
+
+En x86_64 sin la instrucción FMA, que es la compilación del R de Fedora y la de Rtools45, los núcleos
+pasan del `fma` de glibc, que en este procesador salta en tiempo de ejecución a la instrucción, al `fma`
+por programa. La sonda en C de la salida 06 midió, en nanosegundos por llamada: exp de 7,4 a 21, sin de
+62 a 285, log1p de 8,1 a 21,7, acos de 14,4 a 44,2 y tanh de 17,1 a 41,8; con la instrucción en línea
+bajan a 3,4, 22,2, 5,2, 7,8 y 6,6. A través del evaluador del paquete, la medición de esta sesión
+comparó la instalación del árbol aceptado de U3b con la del árbol de esta unidad, que difieren sólo en
+ese punto (la primera deja `fma` y `roundeven` sin resolver y la segunda ninguno): un millón de entradas
+deterministas por función, siete repeticiones en un proceso nuevo por biblioteca, fijado al núcleo 15,
+en tres rondas alternadas, con carga de fondo de 2,0 a 2,3 en la máquina. Las medianas de las tres
+rondas dan exp de 11 a 29 nanosegundos por llamada, sin de 58 a 243, log1p de 13 a 25, acos de 20 a 44 y
+tanh de 24 a 58, un factor de 1,9 a 4,2; la resolución del reloj es de un nanosegundo por llamada. Ninguna
+documentación del paquete promete tiempos. Guion y salida en `~/.cache/ra-research/p1_cost_s07/`
+(`bench.R`, `bench_out.txt`).
+
+### §16.4. La fuga de Rmpfr sale del proceso que se examina
+
+Bajo valgrind, `test-operator-table.R` dejaba 24 bytes perdidos con la pila `realloc`,
+`__gmp_default_reallocate`, `mpfr_reallocate_func`, `mpfr_set_prec`, `R_asMPFR (convert.c:368)` y
+`Math_mpfr (Ops.c:73)`. La causa es de Rmpfr: `Math_mpfr()` convierte el argumento antes de rehusar
+`trigamma` con «Math op. 43 not yet implemented», y la macro de error salta fuera de la función sin
+liberar esa conversión; se reproduce con Rmpfr solo, sin este paquete (`sonda_t1/`). La llamada es el
+control positivo de que el motor no provee `trigamma`, y sin cambio la plataforma valgrind de la matriz
+falla y los chequeos de memoria de CRAN atribuirían la fuga al paquete. El control corre ahora en un
+proceso R hijo que imprime `REFUSED`, `PROVIDED` o `NO_BACKEND`, y la prueba exige `REFUSED`: lo que
+mide no cambia. Validado en los dos sentidos: con el Rmpfr instalado el archivo pasa con 80 resultados
+y valgrind informa `definitely lost: 0 bytes in 0 blocks`; con un método `trigamma` para `mpfr`
+definido en el hijo, el control falla; sin Rmpfr en el hijo imprime `NO_BACKEND` y también falla.
+Alternativas descartadas: un archivo de supresión de valgrind, que lee R-hub y no los chequeos de
+memoria de CRAN; y dejar la prueba y explicarla, que deja una plataforma de la matriz en falla. El
+informe al mantenedor de Rmpfr está redactado en `sonda_t1/BORRADOR_INFORME_RMPFR.md` y no se envía sin
+José.
+
+### §16.5. Cómo se hizo y cómo se juzga
+
+El diseño pasó por las rondas de revisión 11 (aceptada, cuatro objeciones reproducidas y reparadas) y
+12, que murió por la cuota del ingeniero sin revisar nada. El 2026-09-15 José decidió seguir sin Codex:
+sin revisión de diseño de otro linaje para lo que falta y con el trabajo aplicado hecho a mano por el
+asistente, por impedimento medido del entorno del ingeniero (cuota de la cuenta agotada hasta el
+2026-09-21 a las 14:02:55). La decorrelación se sustituye por oráculos escritos y validados en los dos
+sentidos antes de implementar, que no se editaron; por reejecuciones que compilan cada una sobre su
+propia copia del árbol; y por la matriz de plataformas reales como referente externo. Queda abierta,
+sin bloquear, la pregunta de una revisión retrospectiva de esta unidad por Codex después del 21/09.
+
+Durante la implementación, un cambio por vez y cada uno juzgado por su oráculo sobre el árbol real:
+`O_MUSL_DERIVED PASS` (los doce pasos aplicados el número de veces medido y la parte marcada idéntica);
+`O_PORTABLE_MATH PASS` (seis configuraciones sin diagnósticos ni símbolos sin resolver, con la salvedad
+de que `nm` no lee el objeto Mach-O de `aarch64-macos`; con `-mfma`, la instrucción y ninguna llamada;
+140.004.192 ternas iguales a la instrucción FMA con gcc `-O2`, gcc `-O0` y clang `-O2`; `roundeven` igual
+a glibc en 66.388.387 casos con `-O2` y `-O0`); `O_IMPORT PASS` con diecinueve archivos reproducidos;
+`O_VENDOR_DELTA PASS` en los quince núcleos; `O_T1_TEXT PASS`; `O_SEAL6 PASS` con 164 entradas contra
+159 de la base; `O_COPYRIGHTS PASS`. La definición de completado son las diecisiete comprobaciones del
+bloque 5 del encargo, corridas después de la última edición de esta sección, cada una sobre su copia,
+con `ra-rhub-verify/borrador_r13/adjudicar_ra-coremath-portable_copias.sh`; sus salidas literales están
+en `~/TheBridge/LLMs_Exchange/ra-coremath-portable/evidencia/PARTE_MANUAL_SESION_07.md`.

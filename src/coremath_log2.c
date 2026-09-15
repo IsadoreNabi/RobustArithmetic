@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded base-2 logarithm of binary64 values.
 
 Copyright (c) 2023 Alexei Sibidanov.
@@ -49,7 +50,7 @@ static inline double adddd(double xh, double xl, double ch, double cl, double *l
 }
 
 static inline double muldd_acc(double xh, double xl, double ch, double cl, double *l){
-  double ahlh = ch*xl, alhh = cl*xh, ahhh = ch*xh, ahhl = __builtin_fma(ch, xh, -ahhh);
+  double ahlh = ch*xl, alhh = cl*xh, ahhh = ch*xh, ahhl = ra_fma(ch, xh, -ahhh);
   ahhl += alhh + ahlh;
   return fasttwosum (ahhh, ahhl, l);
 }
@@ -171,7 +172,7 @@ double ra_cr_log2(double x){
   int i1 = j>>5, i2 = j&0x1f;
   const double l2h = 0x1.71548p+0, l2l = -0x1.ad47a2f472159p-22;
   double r = r1[i1]*r2[i2];
-  double o = r*t.f, dxl = __builtin_fma(r,t.f,-o), dxh = o - l2h, dx = dxh + dxl, dx2 = dx*dx;
+  double o = r*t.f, dxl = ra_fma(r,t.f,-o), dxh = o - l2h, dx = dxh + dxl, dx2 = dx*dx;
   double f = dx2*((c[0] + dx*c[1]) + dx2*(c[2] + dx*c[3]));
   double lt = (l1[i1][1] + l2[i2][1]) + ed;
   double lh = lt + dxh, ll = (lt - lh) + dxh;
@@ -286,9 +287,9 @@ static double __attribute__((noinline)) as_log2_refine(double x, double a){
   L[1] = LL[0][i1][1] + LL[1][i2][1] + (LL[2][i3][1] + LL[3][i4][1]);
   L[2] = LL[0][i1][2] + LL[1][i2][2] + (LL[2][i3][2] + LL[3][i4][2]);
   double t12 = t1[i1]*t2[i2], t34 = t3[i3]*t4[i4];
-  double th = t12*t34, tl = __builtin_fma(t12,t34,-th);
-  double dh = th*t.f, dl = __builtin_fma(th,t.f,-dh);
-  double sh = tl*t.f, sl = __builtin_fma(tl,t.f,-sh);
+  double th = t12*t34, tl = ra_fma(t12,t34,-th);
+  double dh = th*t.f, dl = ra_fma(th,t.f,-dh);
+  double sh = tl*t.f, sl = ra_fma(tl,t.f,-sh);
   double xl, xh = fasttwosum(dh-1, dl, &xl);
   xh = adddd(xh, xl, sh, sl, &xl);
   sl = xh*(cl[0] + xh*(cl[1] + xh*cl[2]));

@@ -7,114 +7,144 @@ Pinned commit: 1ab68b70b90f807fd2bc9cf20ec295d49ae09592
 Upstream archive SHA-256: 52f35d1029a6c6423f8c537f59164b2359cffe98c1ca2079ea55caf5d1820ce5
 
 The files below are copied under the MIT license reproduced at the end of
-this file. The local changes are limited to namespace isolation and portable,
-warning-free compilation; the mathematical algorithms and constants are
-unchanged.
+this section. The local changes are limited to namespace isolation, portable
+warning-free compilation, and taking fma and roundeven from
+src/ra_portable_math.h instead of the math library of the platform; the
+mathematical algorithms and constants are unchanged.
 
 Repository file: src/coremath_exp.c
 Upstream file: src/binary64/exp/exp.c
 Copyright: 2022-2025 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_exp to ra_cr_exp.
+cr_exp to ra_cr_exp; inserted #include "ra_portable_math.h" as the first line;
+replaced __builtin_fma by ra_fma; replaced the compiler-dependent definition
+of roundeven_finite by #define roundeven_finite(x) ra_roundeven_finite (x).
 
 Repository file: src/coremath_log.c
 Upstream file: src/binary64/log/log.c
 Copyright: 2022 INRIA and CERN; authors Paul Zimmermann and Tom Hubrecht
 Local changes: flattened the file name and dint.h inclusion; removed the GCC
 diagnostic-suppression block; replaced the STDC FENV_ACCESS pragma with an
-inert comment; renamed the cr_log symbol family to ra_cr_log.
+inert comment; renamed the cr_log symbol family to ra_cr_log; inserted
+#include "ra_portable_math.h" as the first line; replaced __builtin_fma by
+ra_fma.
 
 Repository file: src/coremath_sin.c
 Upstream file: src/binary64/sin/sin.c
 Copyright: 2022-2025 Paul Zimmermann and Tom Hubrecht
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; marked the
-128-bit type declaration as a compiler extension; renamed cr_sin to ra_cr_sin.
+128-bit type declaration as a compiler extension; renamed cr_sin to ra_cr_sin;
+inserted #include "ra_portable_math.h" as the first line; replaced
+__builtin_fma by ra_fma.
 
 Repository file: src/coremath_cos.c
 Upstream file: src/binary64/cos/cos.c
 Copyright: 2022-2025 Paul Zimmermann and Tom Hubrecht
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; marked the
-128-bit type declaration as a compiler extension; renamed cr_cos to ra_cr_cos.
+128-bit type declaration as a compiler extension; renamed cr_cos to ra_cr_cos;
+inserted #include "ra_portable_math.h" as the first line; replaced
+__builtin_fma by ra_fma.
 
 Repository file: src/coremath_tan.c
 Upstream file: src/binary64/tan/tan.c
 Copyright: 2022-2025 Paul Zimmermann and Tom Hubrecht
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; marked the
-128-bit type declaration as a compiler extension; renamed cr_tan to ra_cr_tan.
+128-bit type declaration as a compiler extension; renamed cr_tan to ra_cr_tan;
+inserted #include "ra_portable_math.h" as the first line; replaced
+__builtin_fma by ra_fma.
 
 Repository file: src/coremath_sinh.c
 Upstream file: src/binary64/sinh/sinh.c
 Copyright: 2023-2026 Alexei Sibidanov and Paul Zimmermann
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_sinh to ra_cr_sinh.
+cr_sinh to ra_cr_sinh; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma.
 
 Repository file: src/coremath_cosh.c
 Upstream file: src/binary64/cosh/cosh.c
 Copyright: 2023-2025 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_cosh to ra_cr_cosh.
+cr_cosh to ra_cr_cosh; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma.
 
 Repository file: src/coremath_tanh.c
 Upstream file: src/binary64/tanh/tanh.c
 Copyright: 2023-2026 Alexei Sibidanov, Cyprien Peignier, and Paul Zimmermann
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_tanh to ra_cr_tanh.
+cr_tanh to ra_cr_tanh; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma.
 
 Repository file: src/coremath_expm1.c
 Upstream file: src/binary64/expm1/expm1.c
 Copyright: 2024 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_expm1 to ra_cr_expm1.
+cr_expm1 to ra_cr_expm1; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma; replaced the compiler-dependent
+definition of roundeven_finite by #define roundeven_finite(x)
+ra_roundeven_finite (x).
 
 Repository file: src/coremath_log1p.c
 Upstream file: src/binary64/log1p/log1p.c
 Copyright: 2024-2025 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_log1p to ra_cr_log1p.
+cr_log1p to ra_cr_log1p; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma; replaced the compiler-dependent
+definition of roundeven_finite by #define roundeven_finite(x)
+ra_roundeven_finite (x).
 
 Repository file: src/coremath_log2.c
 Upstream file: src/binary64/log2/log2.c
 Copyright: 2023 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_log2 to ra_cr_log2.
+cr_log2 to ra_cr_log2; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma.
 
 Repository file: src/coremath_log10.c
 Upstream file: src/binary64/log10/log10.c
 Copyright: 2022-2025 INRIA and CERN; authors Paul Zimmermann and Tom Hubrecht
 Local changes: flattened the file name and dint.h inclusion; removed the GCC
 diagnostic-suppression block; replaced the STDC FENV_ACCESS pragma with an
-inert comment; renamed the cr_log10 symbol family to ra_cr_log10.
+inert comment; renamed the cr_log10 symbol family to ra_cr_log10; inserted
+#include "ra_portable_math.h" as the first line; replaced __builtin_fma by
+ra_fma.
 
 Repository file: src/coremath_asin.c
 Upstream file: src/binary64/asin/asin.c
 Copyright: 2022-2026 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_asin to ra_cr_asin.
+cr_asin to ra_cr_asin; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma; replaced the compiler-dependent
+definition of roundeven_finite by #define roundeven_finite(x)
+ra_roundeven_finite (x).
 
 Repository file: src/coremath_acos.c
 Upstream file: src/binary64/acos/acos.c
 Copyright: 2024-2025 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_acos to ra_cr_acos.
+cr_acos to ra_cr_acos; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma; replaced the compiler-dependent
+definition of roundeven_finite by #define roundeven_finite(x)
+ra_roundeven_finite (x).
 
 Repository file: src/coremath_atan.c
 Upstream file: src/binary64/atan/atan.c
 Copyright: 2023 Alexei Sibidanov
 Local changes: flattened the file name; removed the GCC diagnostic-suppression
 block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
-cr_atan to ra_cr_atan.
+cr_atan to ra_cr_atan; inserted #include "ra_portable_math.h" as the first
+line; replaced __builtin_fma by ra_fma.
 
 Repository file: src/coremath_log_dint.h
 Upstream file: src/binary64/log/dint.h
@@ -162,3 +192,64 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+musl code included in RobustArithmetic
+======================================
+
+Upstream project: musl
+Upstream repository: https://git.musl-libc.org/git/musl
+Pinned commit: 9683bd62414604d3bd56cf6bd7be8f54aa31e7d3
+
+The part of src/ra_portable_math.h between its BEGIN and END lines is derived
+from the musl file below under the MIT license reproduced at the end of this
+section. The pinned upstream file and the upstream COPYRIGHT file are kept in
+dev/musl/, and dev/musl/UPSTREAM records the commit and the SHA-256 of fma.c.
+
+Repository file: src/ra_portable_math.h
+Upstream file: src/math/fma.c
+Upstream file SHA-256: f3e328da492e4818f83737bab2b8b7d8cf281c4ce3730773c99ab8c7efc41dc7
+Copyright: musl authors, notice below; the pinned content of src/math/fma.c is
+the rewrite by Szabolcs Nagy of 2017-10-13 with his fix of 2024-03-14, which
+is the pinned commit
+Local changes: removed the four include lines; prefixed the local names with
+ra_fma_ or RA_FMA_; made the two helpers and the entry point static inline and
+named the entry point ra_fma; removed the STDC FENV_ACCESS pragma; replaced
+the count-leading-zeros helper of musl by __builtin_clzll; replaced the final
+scaling call by ra_fma_scale; parenthesized six shift counts. The rest of the
+header (ra_roundeven_finite, ra_fma_pow2, ra_fma_scale and the selection of
+the FMA instruction) is code of this package.
+
+Repository file: dev/musl/fma.c
+Upstream file: src/math/fma.c
+Local changes: none.
+
+Repository file: dev/musl/COPYRIGHT
+Upstream file: COPYRIGHT
+Local changes: none.
+
+MIT license of musl
+-------------------
+
+musl as a whole is distributed under the following license (MIT license,
+https://spdx.org/licenses/MIT), with this copyright notice:
+
+Copyright © 2005-2020 Rich Felker, et al.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

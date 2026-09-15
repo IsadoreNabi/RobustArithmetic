@@ -1,0 +1,4 @@
+repository https://git.musl-libc.org/git/musl
+commit 9683bd62414604d3bd56cf6bd7be8f54aa31e7d3
+path src/math/fma.c
+sha256 f3e328da492e4818f83737bab2b8b7d8cf281c4ce3730773c99ab8c7efc41dc7

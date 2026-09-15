@@ -127,7 +127,19 @@ test_that("POSITIVE CONTROL: the exclusions must still fail the criterion they w
   ## leaves it at trigamma. If the backend ever implements it, this fails and
   ## the exclusion has to be revisited rather than kept out of habit.
   skip_if_not(ra_has_mpfr(), "needs Rmpfr")
-  expect_error(trigamma(Rmpfr::mpfr("2.5", 120L)))
+  ## The call runs in a separate R process. Rmpfr converts the argument before it
+  ## refuses trigamma and does not release that conversion on its error path, so in
+  ## the checked process a memory checker would report the backend's leak here.
+  child <- tempfile(fileext = ".R")
+  on.exit(unlink(child), add = TRUE)
+  writeLines(c(
+    "if (!requireNamespace('Rmpfr', quietly = TRUE)) { cat('NO_BACKEND\\n'); quit(save = 'no') }",
+    "r <- try(trigamma(Rmpfr::mpfr('2.5', 120L)), silent = TRUE)",
+    "cat(if (inherits(r, 'try-error')) 'REFUSED' else 'PROVIDED', '\\n', sep = '')"
+  ), child)
+  out <- system2(file.path(R.home("bin"), "Rscript"), c("--vanilla", shQuote(child)),
+                 stdout = TRUE, stderr = FALSE)
+  expect_identical(tail(out, 1L), "REFUSED")
   ## And the reason the chain matters: differentiating gamma reaches it.
   expect_true("trigamma" %in% differentiation_closure("gamma"))
 })

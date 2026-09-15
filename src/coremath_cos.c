@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly-rounded cosine function for binary64 value.
 
 Copyright (c) 2022-2025 Paul Zimmermann and Tom Hubrecht
@@ -1271,7 +1272,7 @@ static const double SC[256][3] = {
 // Multiply exactly a and b, such that *hi + *lo = a * b. 
 static inline void a_mul(double *hi, double *lo, double a, double b) {
   *hi = a * b;
-  *lo = __builtin_fma (a, b, -*hi);
+  *lo = ra_fma (a, b, -*hi);
 }
 
 /* Multiply a double with a double double : a * (bh + bl)
@@ -1279,7 +1280,7 @@ static inline void a_mul(double *hi, double *lo, double a, double b) {
 static inline void s_mul (double *hi, double *lo, double a, double bh,
                           double bl) {
   a_mul (hi, lo, a, bh); /* exact */
-  *lo = __builtin_fma (a, bl, *lo);
+  *lo = ra_fma (a, bl, *lo);
   /* the error is bounded by ulp(lo), where |lo| < |a*bl| + ulp(hi) */
 }
 
@@ -1290,8 +1291,8 @@ static inline void d_mul(double *hi, double *lo, double ah, double al,
   double s, t;
 
   a_mul(hi, &s, ah, bh);
-  t = __builtin_fma(al, bh, s);
-  *lo = __builtin_fma(ah, bl, t);
+  t = ra_fma(al, bh, s);
+  *lo = ra_fma(ah, bl, t);
 }
 
 static inline void
@@ -1314,8 +1315,8 @@ evalPSfast (double *h, double *l, double xh, double xl, double uh, double ul)
 {
   double t;
   *h = PSfast[4]; // degree 7
-  *h = __builtin_fma (*h, uh, PSfast[3]); // degree 5
-  *h = __builtin_fma (*h, uh, PSfast[2]); // degree 3
+  *h = ra_fma (*h, uh, PSfast[3]); // degree 5
+  *h = ra_fma (*h, uh, PSfast[2]); // degree 3
   s_mul (h, l, *h, uh, ul);
   fast_two_sum (h, &t, PSfast[0], *h);
   *l += PSfast[1] + t;
@@ -1333,8 +1334,8 @@ evalPCfast (double *h, double *l, double uh, double ul)
 {
   double t;
   *h = PCfast[4]; // degree 6
-  *h = __builtin_fma (*h, uh, PCfast[3]); // degree 4
-  *h = __builtin_fma (*h, uh, PCfast[2]); // degree 2
+  *h = ra_fma (*h, uh, PCfast[3]); // degree 4
+  *h = ra_fma (*h, uh, PCfast[2]); // degree 2
   s_mul (h, l, *h, uh, ul);
   fast_two_sum (h, &t, PCfast[0], *h);
   *l += PCfast[1] + t;
@@ -1630,7 +1631,7 @@ reduce_fast (double *h, double *l, double x, double *err1)
 #define CH 0x1.45f306dc9c883p-3
 #define CL -0x1.6b01ec5417056p-57
       a_mul (h, l, CH, x);            // exact
-      *l = __builtin_fma (CL, x, *l);
+      *l = ra_fma (CL, x, *l);
       /* The error in the above fma() is at most ulp(l),
          where |l| <= CL*|x|+|l_in|.
          Assume 2^(e-1) <= x < 2^e.
@@ -1734,7 +1735,7 @@ reduce_fast (double *h, double *l, double x, double *err1)
     }
 
   double i = __builtin_floor (*h * 0x1p11);
-  *h = __builtin_fma (i, -0x1p-11, *h);
+  *h = ra_fma (i, -0x1p-11, *h);
   return i;
 }
 
@@ -1807,7 +1808,7 @@ cos_fast (double *h, double *l, double x)
   // from reduce_fast() we have |l| < 2^-52.36
   double uh, ul;
   a_mul (&uh, &ul, *h, *h);
-  ul = __builtin_fma (*h + *h, *l, ul);
+  ul = ra_fma (*h + *h, *l, ul);
   // uh+ul approximates (h+l)^2
   evalPSfast (&sh, &sl, *h, *l, uh, ul);
   /* the absolute error of evalPSfast() is less than 2^-77.09 from
@@ -2050,7 +2051,7 @@ ra_cr_cos (double x)
   t.u &= 0x7fffffffffffffff;
   if (__builtin_expect (t.u <= 0x3e46a09e667f3bcc, 0))
     // |x| <= 0x1.6a09e667f3bccp-27
-    return __builtin_fma (t.f, -0x1p-28, 1.0);
+    return ra_fma (t.f, -0x1p-28, 1.0);
 
   double h, l, err;
   err = cos_fast (&h, &l, t.f);

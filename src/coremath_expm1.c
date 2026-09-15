@@ -1,3 +1,4 @@
+#include "ra_portable_math.h"
 /* Correctly rounded e^x-1 function for binary64 values.
 
 Copyright (c) 2024 Alexei Sibidanov.
@@ -35,42 +36,7 @@ SOFTWARE.
 
 /* STDC FENV_ACCESS is intentionally not requested in this vendored build. */
 
-/* __builtin_roundeven was introduced in gcc 10:
-   https://gcc.gnu.org/gcc-10/changes.html,
-   and in clang 17 */
-#if ((defined(__GNUC__) && __GNUC__ >= 10) || (defined(__clang__) && __clang_major__ >= 17)) && !defined(_MSC_VER) && (defined(__aarch64__) || defined(__x86_64__) || defined(__i386__))
-# define roundeven_finite(x) __builtin_roundeven (x)
-#else
-/* round x to nearest integer, breaking ties to even */
-static double
-roundeven_finite (double x)
-{
-  double ix;
-# if (defined(__GNUC__) || defined(__clang__)) && (defined(__AVX__) || defined(__SSE4_1__) || (__ARM_ARCH >= 8))
-#  if defined __AVX__
-   __asm__("vroundsd $0x8,%1,%1,%0":"=x"(ix):"x"(x));
-#  elif __ARM_ARCH >= 8
-   __asm__ ("frintn %d0, %d1":"=w"(ix):"w"(x));
-#  else /* __SSE4_1__ */
-   __asm__("roundsd $0x8,%1,%0":"=x"(ix):"x"(x));
-#  endif
-# else
-  ix = __builtin_round (x); /* nearest, away from 0 */
-  if (__builtin_fabs (ix - x) == 0.5)
-  {
-    /* if ix is odd, we should return ix-1 if x>0, and ix+1 if x<0 */
-    union { double f; uint64_t n; } u, v;
-    u.f = ix;
-    v.f = ix - __builtin_copysign (1.0, x);
-    /* Warning: v.n is 0 when x=0.5; while u.n cannot be zero since ix
-       is rounded away from zero. */
-    if (v.n == 0 || __builtin_ctzll (v.n) > __builtin_ctzll (u.n))
-      ix = v.f;
-  }
-# endif
-  return ix;
-}
-#endif
+#define roundeven_finite(x) ra_roundeven_finite (x)
 
 typedef int64_t i64;
 typedef uint64_t u64;
@@ -90,13 +56,13 @@ static inline double fastsum(double xh, double xl, double yh, double yl, double 
 
 static inline double muldd(double xh, double xl, double ch, double cl, double *l){
   double ahhh = ch*xh;
-  *l = (ch*xl + cl*xh) + __builtin_fma(ch, xh, -ahhh);
+  *l = (ch*xl + cl*xh) + ra_fma(ch, xh, -ahhh);
   return ahhh;
 }
 
 static inline double mulddd(double xh, double xl, double c, double *l){
   double h = c*xh;
-  *l = c*xl + __builtin_fma(c, xh, -h);
+  *l = c*xl + ra_fma(c, xh, -h);
   return h;
 }
 
@@ -301,7 +267,7 @@ static double __attribute__((noinline)) as_expm1_accurate(double x){
     fh = mulddd(fh,fl, x, &fl);
     fh = mulddd(fh,fl, x, &fl);
     fh = mulddd(fh,fl, x, &fl);
-    double hx = 0.5*x, x2h = x*hx, x2l = __builtin_fma(x,hx,-x2h);
+    double hx = 0.5*x, x2h = x*hx, x2l = ra_fma(x,hx,-x2h);
     fh = fastsum(x2h,x2l, fh,fl, &fl);
     double v2, v0 = fasttwosum(x, fh, &v2), v1 = fasttwosum(v2, fl, &v2);
     v0 = fasttwosum(v0,v1, &v1);
@@ -328,7 +294,7 @@ static double __attribute__((noinline)) as_expm1_accurate(double x){
     double tl, th = muldd(t0h,t0l, t1h,t1l, &tl);
 
     const double l2h = 0x1.62e42ffp-13, l2l = 0x1.718432a1b0e26p-47, l2ll = 0x1.9ff0342542fc3p-102;
-    double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + __builtin_fma(l2l,t,-dxl);
+    double dx = x - l2h*t, dxl = l2l*t, dxll = l2ll*t + ra_fma(l2l,t,-dxl);
     double dxh = dx + dxl; dxl = (dx - dxh) + dxl + dxll;
     double fl, fh = opolydd(dxh,dxl, 7,ch, &fl);
     fh = muldd(dxh,dxl, fh,fl, &fl);
@@ -360,7 +326,7 @@ double ra_cr_expm1(double x){
   if(__builtin_expect(aix < 0x3fd0000000000000ull, 1)){ // |x| < 0.25
     if( __builtin_expect(aix < 0x3ca0000000000000ull, 0)) { // |x| < 2^-53
       if( !aix ) return x;
-      double res = __builtin_fma(0x1p-54, __builtin_fabs(x), x);
+      double res = ra_fma(0x1p-54, __builtin_fabs(x), x);
 #ifdef CORE_MATH_SUPPORT_ERRNO
       /* we have underflow for |x| < 2^-1022 and for x=-0x1p-1022 and
          rounding towards zero */
