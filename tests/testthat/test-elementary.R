@@ -6,6 +6,8 @@
 ## these report that a specific defect would have been caught.
 
 test_that("CP-3: a wrong monotonicity class breaks containment", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## cosh has its minimum in the interior of any interval straddling zero, so
   ## treating it as increasing puts the lower endpoint at cosh(a), which is
   ## above the true minimum of 1 whenever a < 0.
@@ -20,6 +22,8 @@ test_that("CP-3: a wrong monotonicity class breaks containment", {
 })
 
 test_that("CP-4: ignoring interior extrema of sin breaks containment", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## On [0, pi] both endpoints of sin are within a rounding step of zero and the
   ## maximum is interior. An implementation that read only the endpoints would
   ## return an interval of width about 1e-16 for a function whose range is
@@ -36,6 +40,8 @@ test_that("CP-4: ignoring interior extrema of sin breaks containment", {
 })
 
 test_that("CP-5: an interval straddling a pole of tan is entire and trivial", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   x <- ra_interval(1, 2)
   got <- ra_elem("tan", x)
   expect_true(ra_is_entire(got))
@@ -52,6 +58,8 @@ test_that("CP-5: an interval straddling a pole of tan is entire and trivial", {
 })
 
 test_that("CP-6: domain errors are trivial, never ill, and never NaN", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   part <- ra_elem("log", ra_interval(-1, 2))
   expect_identical(ra_dec(part), "trv")
   expect_identical(ra_inf(part), -Inf)
@@ -72,6 +80,8 @@ test_that("CP-6: domain errors are trivial, never ill, and never NaN", {
 })
 
 test_that("CP: com asserts a bounded argument box, not only a bounded result", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## atan of the whole line is bounded, but the argument box is not, and the
   ## standard reserves com for a bounded argument box.
   got <- ra_elem("atan", ra_entire())
@@ -94,6 +104,8 @@ test_that("the declared monotonicity classes are verified, not asserted", {
 })
 
 test_that("the exact extrema carry no slack", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## The supremum of sin over an interval containing a maximum is exactly one,
   ## because it is the mathematical value and not a library evaluation.
   full <- ra_elem("sin", ra_interval(0, 7))
@@ -104,6 +116,8 @@ test_that("the exact extrema carry no slack", {
 })
 
 test_that("a point interval is enclosed by its own evaluation widened by slack", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   for (f in ra_operator_table()$fun) {
     v <- switch(f,
                 log = , log2 = , log10 = , sqrt = 0.7,
@@ -128,6 +142,8 @@ test_that("a point interval is enclosed by its own evaluation widened by slack",
 })
 
 test_that("the enclosure does not depend on how many intervals were passed", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## R reaches the system math library by more than one route and the routes
   ## were measured not to agree to the last bit. An enclosure that changed with
   ## the batch size would be wrong in a way nothing printed would show, so the
@@ -189,6 +205,8 @@ test_that("the error of the path in use is measured against the publication", {
 })
 
 test_that("empty and Not-an-Interval propagate through the elementary layer", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   expect_true(ra_is_empty(ra_elem("exp", ra_empty())))
   expect_identical(ra_dec(ra_elem("exp", ra_empty())), "trv")
   expect_true(ra_is_nai(ra_elem("exp", ra_nai())))
@@ -203,6 +221,8 @@ test_that("a symbol outside the closed table is refused by name", {
 })
 
 test_that("the elementary layer is vectorised over intervals", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   x <- c(ra_interval(0, 1), ra_interval(2, 3), ra_empty())
   got <- ra_elem("exp", x)
   expect_identical(length(got), 3L)
@@ -211,6 +231,8 @@ test_that("the elementary layer is vectorised over intervals", {
 })
 
 test_that("the periodic frontier is set by the format, not by the reduction", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## Pre-registered in dev/PREREGISTRO_FASE_2.md, section 4-bis: the magnitude
   ## at which the sine of a box stops resolving below the whole range is
   ## governed by the width of the box against the period, not by the precision
@@ -234,9 +256,8 @@ test_that("CP-7: the ladder resolves what the fast level cannot, and abstains at
   ## nothing for the ladder to climb from, and the test would be measuring the
   ## machine's library instead of the ladder. The widths asserted below come
   ## from the declared slack steps and not from the library's accuracy.
-  old_degraded <- .ra_state$fast_degraded
-  on.exit(assign("fast_degraded", old_degraded, envir = .ra_state), add = TRUE)
-  assign("fast_degraded", FALSE, envir = .ra_state)
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
 
   ## A question the fast level cannot settle: an enclosure of sin(1) narrower
   ## than one unit in the last place. The fast level spends three slack steps

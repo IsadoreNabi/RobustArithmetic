@@ -1360,3 +1360,102 @@ No se modificaron el código, las pruebas, la documentación de funciones, los d
 nombres, la licencia ni ningún campo restante de `DESCRIPTION`. Esta unidad tampoco ejecutó
 operaciones de git ni envió o publicó el paquete; deja en disco el archivo fuente y los tres
 registros para su comprobación antes del reenvío.
+
+---
+
+## §12. El rechazo de Windows completa la matriz de degradación del nivel rápido
+
+El pretest de CRAN del 2026-09-14 aceptó el contenido del paquete en Debian con una única nota de
+factibilidad, `Days since last update: 2`, pero Windows Server 2022, con R-devel 4.7.0 ucrt, terminó
+la suite en `[ FAIL 1 | WARN 186 | SKIP 26 | PASS 625 ]`. El único error apareció en
+`test-newton.R`, en la prueba de procedencia de los veredictos rápidos: `.ra_fast_gate()` lanzó la
+condición `ra_fast_level_unsafe` cuando la propia prueba había simulado que Rmpfr no estaba
+disponible.
+
+### §12.1. El mecanismo observado y la causa de método
+
+Los centinelas de carga pasaron en Windows, pero la auditoría del primer uso rápido midió las rutas
+de seno y coseno por encima de sus holguras. Esa medición degradó el nivel rápido para el resto de
+la sesión. Mientras Rmpfr seguía visible, cada operación elemental escaló al nivel riguroso y emitió
+la advertencia prevista; luego la prueba de procedencia ocultó Rmpfr para distinguir los veredictos
+aritméticos de los elementales, pero dejó vigente la degradación de la sesión. La compuerta aplicó
+entonces C-54(c): sin un nivel riguroso al cual escalar, rehusó devolver un encierro. El error no
+estaba en la compuerta ni en la regla de degradación, sino en una prueba sobre la contabilidad de
+procedencia que había heredado un hecho contingente de la máquina.
+
+La matriz de verificación del reenvío ya combinaba el R del sistema, un R compilado sin doble largo
+y la presencia o ausencia de Rmpfr, pero no incluía una biblioteca matemática que activara la
+degradación. Por eso el defecto nuevo pasó todas las verificaciones locales. Al agregar ese eje, la
+medición de partida reprodujo el error de Windows en `windows_sys`, `loaddeg_sys` y
+`windows_nold_mpfr`, y reveló catorce errores en `loaddeg_nold_nompfr`, una configuración sin doble
+largo, sin Rmpfr y con el nivel rápido degradado desde la carga. La causa de método fue, por tanto,
+una matriz incompleta: verificaba la disponibilidad de niveles, pero no el estado de la compuerta
+que decide si esos niveles pueden usarse.
+
+### §12.2. Un único ayudante separa las propiedades del código del estado de la máquina
+
+`tests/testthat/helper-fast-level.R` introduce `hold_fast_level_open()`. El ayudante guarda
+`fast_degraded`, `fast_audited` y `fast_audit`; abre el nivel rápido fijando, respectivamente,
+`FALSE`, `TRUE` y `NULL`; y devuelve una función que restaura exactamente los tres valores al salir
+de la prueba. Marcar la auditoría como ya realizada es tan necesario como limpiar la degradación:
+si sólo se limpiara esta última, el primer uso podría volver a degradar el nivel durante la misma
+prueba. Los sitios que antes mantenían abierto el nivel mediante asignaciones propias —la escalera
+de `test-elementary.R` y las dos pruebas S3 de `test-safeguards.R`— usan también el ayudante. Las
+asignaciones manuales que permanecen en `test-safeguards.R` no son una segunda forma de abrir el
+nivel: una fuerza la degradación para probar S5 y la otra limpia la sesión para probar que S2
+ejecuta y conserva la auditoría.
+
+Las catorce pruebas que fallaban bajo degradación mantienen ahora abierto el nivel rápido durante
+su propio bloque. Ninguna afirma que el error de la biblioteca matemática esté dentro de la
+holgura: las propiedades y sus referentes son los siguientes.
+
+| archivo y prueba | propiedad afirmada | independencia de la holgura de la máquina |
+| --- | --- | --- |
+| `test-elementary.R`, CP-3 | La clase de `cosh` conserva el mínimo interior de uno y evita el encierro obtenido al tratarla como creciente. | El mínimo es exacto y las demás comparaciones usan la misma ruta ordinaria a ambos lados; no se contrasta su error con un valor multiprecisión ni con la holgura. |
+| `test-elementary.R`, CP-4 | El encierro de `sin` incluye el máximo interior exacto y no se reduce a las evaluaciones de los extremos. | El control decisivo es el máximo exacto de uno; el barrido auxiliar usa la misma evaluación ordinaria y no asevera su exactitud. |
+| `test-elementary.R`, CP-5 | Un intervalo que cruza un polo de `tan` produce el intervalo entero con decoración trivial, mientras uno alejado conserva decoración común. | El cruce del polo, la decoración y la inversión de signos son propiedades estructurales; no se mide el error en unidades de último lugar. |
+| `test-elementary.R`, CP-6 | Los dominios parciales o vacíos de `log` y `asin` producen intervalos y decoraciones válidos, nunca un valor indeterminado silencioso. | Las afirmaciones conciernen al dominio, infinitos, ausencia de valores faltantes y decoraciones; `log(2)` se compara por la misma ruta ordinaria. |
+| `test-elementary.R`, argumento acotado de `com` | La decoración común exige un argumento acotado aunque el recorrido de la función sea acotado. | La prueba interroga la decoración y los extremos estructurales de `atan`; no juzga la exactitud de la biblioteca. |
+| `test-elementary.R`, extremos exactos | Los extremos matemáticos conocidos de `sin`, `cosh` y `sqrt` no consumen holgura. | Las ramas examinadas devuelven exactamente `-1`, `0` o `1`; no dependen de una evaluación aproximada de la biblioteca. |
+| `test-elementary.R`, intervalo puntual | Cada evaluación ordinaria queda dentro del encierro y éste gasta exactamente los pasos declarados. | El referente es la propia evaluación ordinaria y los límites se construyen con antecesores y sucesores; se prueba la aplicación de la holgura, no que ésta cubra el error matemático. |
+| `test-elementary.R`, tamaño del lote | La evaluación vectorial y la evaluación elemento por elemento producen el mismo extremo inferior. | Ambos lados usan la misma biblioteca y la misma ruta del paquete; la igualdad no presupone que el resultado sea correctamente redondeado. |
+| `test-elementary.R`, vacío y no intervalo | Los objetos vacío y no intervalo conservan su identidad y decoración a través de la capa elemental. | Son reglas de propagación de estados y no realizan una afirmación sobre el error de una función matemática. |
+| `test-elementary.R`, vectorización | La capa elemental conserva longitud, contención por su propia ruta y la posición vacía. | La contención auxiliar usa `exp(1)` de la misma ruta ordinaria; longitud y propagación son discretas y ninguna afirmación compara contra la holgura. |
+| `test-elementary.R`, frontera periódica | La pérdida de resolución de una caja periódica sigue la granularidad del formato y aún existe un testigo más estrecho que el recorrido completo. | Se comparan exponentes, anchuras y el testigo construido por la propia maquinaria; no se asevera una cota de error de la biblioteca. |
+| `test-expression.R`, potencia general | Una potencia no entera exige base positiva y debilita la decoración fuera de su dominio, mientras la potencia entera conserva la ruta ajustada. | Las cotas usadas son los valores exactos `0`, `1`, `2` y `16`, junto con decoraciones; no interviene una medición de la biblioteca. |
+| `test-newton.R`, paso de Hansen-Sengupta | Un paso sobre `exp(x)-2` produce un intervalo interior que contiene la raíz representada por `log(2)`. | La raíz de referencia y las evaluaciones del encierro usan la ruta ordinaria del mismo proceso; se prueban clase, contracción y contención, no el cumplimiento de la holgura frente a un referente externo. |
+| `test-newton.R`, procedencia de veredictos | La aritmética conserva procedencia de teorema y las funciones elementales conservan procedencia medida, también en tarjetas, resúmenes, ausencias y abstenciones. | Las afirmaciones son etiquetas lógicas derivadas de las operaciones ejecutadas; los valores numéricos sólo hacen recorrer las ramas y no se comparan con una verdad multiprecisión. |
+
+La degradación real continúa probándose por separado y sin ninguna condición: S5 fuerza el estado
+degradado y exige advertencia con escalamiento cuando Rmpfr está disponible o rechazo tipado cuando
+no lo está; S2 fuerza una sesión limpia y comprueba que el primer uso audite, guarde el resultado y
+no vuelva a medirlo. De este modo, mantener abierto el nivel en las pruebas de su maquinaria no
+debilita las salvaguardas que deciden cuándo cerrarlo en una sesión real.
+
+### §12.3. El arnés permanente y la medición posterior
+
+`dev/check_scenarios.sh` construye un archivo fuente independiente, instala el paquete en
+bibliotecas bajo un directorio de salida nuevo y ejecuta la suite instalada como la ejecuta CRAN.
+Sus archivos de apoyo viven en `dev/scenarios/`. La matriz contiene ocho escenarios: sistema sano,
+ancla distinta, auditoría de sesión al estilo de Windows y degradación desde la carga en el R del
+sistema; y las cuatro contrapartes necesarias en el R sin doble largo, con Rmpfr para la condición
+sana y la de Windows, y sin Rmpfr para el ancla distinta y la degradación de carga. Una sonda
+separada comprueba en cada corrida la biblioteca instalada, la presencia de Rmpfr, el estado de
+degradación, la discrepancia del ancla y si el resolvedor devolvió o rehusó un resultado. El arnés
+cuenta además los ocho escenarios y no puede terminar en `SCENARIOS PASS` si alguno no corrió.
+
+Después de la reparación, los ocho escenarios terminaron con cero fallos y veredicto `OK`. Los
+seis escenarios con Rmpfr conservaron 26 saltos; los dos escenarios sin Rmpfr conservaron 42. Las
+advertencias de `windows_sys`, `loaddeg_sys` y `windows_nold_mpfr` bajaron de 186 a 50 porque las
+pruebas de la maquinaria rápida ya no atraviesan una compuerta degradada; las advertencias restantes
+corresponden a llamadas que sí ejercitan el comportamiento degradado. La comparación bloque por
+bloque confirmó `O2 PASS inadmissible=0 admitted=0`: ninguna prueba falló, se saltó ni ejecutó menos
+expectativas que su referencia.
+
+El arnés permanente terminó en `SCENARIOS PASS` sobre el árbol reparado. Como control negativo, el
+mismo arnés terminó en `SCENARIOS FAIL`, con salida uno, sobre la copia intacta de `d26cd6e`, y nombró
+cuatro veces `test-newton.R:112`; por tanto, el arnés no sólo atraviesa la matriz sino que muerde el
+defecto que motivó esta unidad. La suite completa con todos los portones terminó en
+`SUITE_ALLGATES FAILED 0 ERRORS 0 SKIPPED 2`, con la misma cantidad de saltos que la medición de
+partida. No se modificaron la compuerta, las salvaguardas, los centinelas, las holguras, el ancla, el
+código del paquete ni su documentación de referencia.

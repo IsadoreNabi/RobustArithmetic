@@ -80,6 +80,8 @@ test_that("the centered form beats the natural one on a narrow box", {
 })
 
 test_that("the general power needs a positive base and says so by decoration", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ok <- ra_eval_natural(quote(x^0.5), list(x = ra_interval(1, 4)))
   expect_identical(ra_dec(ok), "com")
   expect_true(ra_inf(ok) <= 1 && ra_sup(ok) >= 2)

@@ -6,6 +6,8 @@
 ## speak; a multiple root must never receive a uniqueness certificate.
 
 test_that("one Hansen-Sengupta step contracts toward a simple root", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   ## exp(x) - 2 has its only root at log(2), interior to [0, 1]
   got <- ra_newton_step(quote(exp(x) - 2), ra_interval(0, 1))
   expect_s3_class(got, "ra_ivl")
@@ -105,6 +107,8 @@ test_that("arithmetic verdicts retain theorem provenance", {
 })
 
 test_that("fast verdict provenance follows the operations actually evaluated", {
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   local_mocked_bindings(ra_has_mpfr = function() FALSE,
                         .package = "RobustArithmetic")
 

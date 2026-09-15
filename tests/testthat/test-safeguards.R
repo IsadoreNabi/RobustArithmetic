@@ -137,9 +137,8 @@ test_that("S3: provenance is carried, propagated by weakness, and printed", {
   ## rigorous level, every enclosure comes back a theorem, and there would be
   ## no measured provenance left to propagate: the test would be measuring the
   ## machine instead of the code. The degradation itself is tested in S5.
-  old_degraded <- .ra_state$fast_degraded
-  on.exit(assign("fast_degraded", old_degraded, envir = .ra_state), add = TRUE)
-  assign("fast_degraded", FALSE, envir = .ra_state)
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   a <- ra_interval(1, 2)
   expect_identical(ra_prov(a), "theorem")
   f <- ra_elem("exp", a)
@@ -169,9 +168,8 @@ test_that("S3: provenance is carried, propagated by weakness, and printed", {
 
 test_that("S3: the weakest provenance also flows through expressions", {
   ## held open for the same reason as the test above
-  old_degraded <- .ra_state$fast_degraded
-  on.exit(assign("fast_degraded", old_degraded, envir = .ra_state), add = TRUE)
-  assign("fast_degraded", FALSE, envir = .ra_state)
+  restore_fast_level <- hold_fast_level_open()
+  on.exit(restore_fast_level(), add = TRUE)
   got <- ra_enclose_expr(quote(exp(x) + 1), ra_interval(0, 1))
   expect_identical(ra_prov(got), "measured")
   if (ra_has_mpfr()) {
