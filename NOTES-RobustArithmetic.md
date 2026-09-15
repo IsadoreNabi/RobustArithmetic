@@ -1545,3 +1545,42 @@ La repetición diagnóstica que declaró como conocidas las banderas devueltas p
 integración queda implementada y sus pruebas funcionales quedan en verde, pero el oráculo de los
 tres chequeos no satisface su resultado esperado hasta que su comando reconozca las banderas
 propias del R anfitrión sin ocultar ninguna bandera que agregue el paquete.
+
+---
+
+## §14. El nivel rápido usa el núcleo correctamente redondeado que viaja con el paquete
+
+El nivel rápido evalúa ahora las dieciséis funciones por la ruta incluida en el paquete: las
+quince funciones binarias de doble precisión de CORE-MATH tomadas del commit sellado
+`1ab68b70b90f807fd2bc9cf20ec295d49ae09592`, y la raíz cuadrada de hardware. El evaluador
+interno `.ra_cr()` reemplaza en `.ra_eval_pts()` la evaluación ordinaria de R, también para los
+argumentos no finitos que no pasan al nivel multiprecisión. `ra_measure_library_error()` conserva
+su nombre, firma y referente independiente, pero mide esa misma ruta incluida contra MPFR; la
+verificación de monotonía conserva deliberadamente las funciones de R, porque comprueba las clases
+matemáticas de forma y no la exactitud de la ruta rápida.
+
+Las dos magnitudes materiales salen de fuentes anteriores al resultado. CORE-MATH declara redondeo
+correcto, que fija una cota de medio paso de último lugar para sus quince funciones, y el estándar
+IEEE 754 exige la misma propiedad a la raíz cuadrada. Sobre `e = 0,5` se aplica literalmente la
+fórmula pre-registrada `ceiling(2e + 1)`, cuyo resultado es una holgura de dos vecinos binarios para
+las dieciséis. La procedencia permanece `measured`: las pruebas difíciles y las comparaciones bit a
+bit sostienen la afirmación de redondeo correcto, pero esta integración no establece un teorema
+función por función.
+
+La primera conexión reveló una distinción entre el número declarado de vecinos y la cantidad que
+puede consumir la fórmula aritmética de antecesor o sucesor. Repetirla dos veces dentro de las dos
+binadas que rodean el umbral subnormal llegó a mover cuatro vecinos exactos, porque cada aplicación
+puede adelantarse uno en esa franja; `O_FASTEXACT` encontró entonces 17 conjuntos fuera del
+presupuesto. El ensanchador cuenta ahora cada aplicación por su costo máximo demostrado: uno fuera
+de la franja y dos dentro de ella, y se detiene si otra aplicación excedería el presupuesto. No se
+cambió la fórmula de la holgura ni las primitivas generales de redondeo.
+
+Antes de esta unidad, `O_FASTEXACT` fallaba en 31 de los 32 conjuntos, `O_TABLE` producía cinco
+señalamientos y había medido hasta 1,987 pasos de error en la ruta de la plataforma, mientras
+`O_DOCS` encontraba 16 afirmaciones que todavía describían esa ruta. Después de la reparación,
+`O_FASTEXACT` terminó con cero violaciones en los 32 conjuntos; `O_TABLE` confirmó medio paso como
+cota declarada, holgura dos para las dieciséis, monotonía concordante y un máximo observado de
+0,499999; `O_DOCS` terminó con cero hallazgos. `O_CR3` volvió a comparar 73.131.510 entradas en cada
+una de sus tres compilaciones y conservó cero conjuntos discrepantes. La tabla, la ayuda, la
+viñeta, el título, la descripción y las pruebas afectadas nombran la ruta incluida y su fuente en
+presente, sin trasladar a la exposición pública la cronología de la sustitución.

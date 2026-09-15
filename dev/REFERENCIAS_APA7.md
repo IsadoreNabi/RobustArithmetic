@@ -118,9 +118,9 @@ cursiva y lleva el número de versión y el corchete descriptivo.
 | `R/interval-class.R` | IEEE (2018) |
 | `R/arithmetic.R` | IEEE (2018); Hansen & Walster (2004); Neumaier (1990) |
 | `R/mpfr-bridge.R` | Fousse et al. (2007); Revol & Rouillier (2005); Maechler (2024) |
-| `R/operator-table.R` | Gladman et al. (2026); IEEE (2019); Moore et al. (2009) |
+| `R/operator-table.R` | Sibidanov et al. (2022); IEEE (2019); Moore et al. (2009) |
 | `R/conditions.R` | Wickham (2019); Maechler (2024); Fousse et al. (2007) |
-| `R/elementary.R` | Moore et al. (2009); IEEE (2018); Gladman et al. (2026); Neumaier (1990); Muller et al. (2018); Revol & Rouillier (2005); Rump (2010); Wickham (2019) |
+| `R/elementary.R` | Moore et al. (2009); IEEE (2018); Sibidanov et al. (2022); Neumaier (1990); Muller et al. (2018); Revol & Rouillier (2005); Rump (2010); Wickham (2019) |
 | `R/expression.R` | Moore et al. (2009); Neumaier (1990) |
 | `R/RobustArithmetic-package.R` | IEEE (2015); Rump et al. (2009); Rump (2010); Neumaier (1990); Hansen & Walster (2004); Moore et al. (2009); Tucker (2011); Sibidanov et al. (2022); CORE-MATH Project (2026) |
 | `R/core-math.R` | Sibidanov et al. (2022) |

@@ -7,10 +7,11 @@
 ## file is built to prevent. The periodic functions are where the work is, and
 ## the file is honest about the one place the fast level gives a wide answer.
 ##
-## Two levels share this skeleton. The fast level evaluates the system math
-## library and widens by the slack declared in the operator table, which is a
-## convention with a citation. The rigorous level evaluates in multiprecision,
-## where correct rounding is a contract, and its enclosure is a theorem.
+## Two levels share this skeleton. The fast level evaluates the correctly
+## rounded binary64 implementation included with the package and widens by the
+## slack declared in the operator table, which is a convention with a citation.
+## The rigorous level evaluates in multiprecision, where correct rounding is a
+## contract, and its enclosure is a theorem.
 
 ## How each admitted function behaves on its domain. The table is declared here
 ## and verified against the functions themselves by ra_verify_monotonicity(),
@@ -102,36 +103,42 @@
   0
 }
 
+## Spend a budget stated in exact binary64 neighbours with the arithmetic
+## predecessor and successor. The formulas are exact outside the two binades
+## around the subnormal threshold and may move two neighbours inside them. A
+## call in that band therefore spends two units of the budget; if only one is
+## left, stopping is both valid and no wider than the declared budget.
+.ra_widen_bounded <- function(v, steps, move) {
+  out <- as.numeric(v)
+  left <- rep_len(as.integer(steps), length(out))
+  while (any(left > 0L)) {
+    band <- is.finite(out) & abs(out) >= 2^-1022 & abs(out) <= 2^-1020
+    cost <- ifelse(band, 2L, 1L)
+    take <- left >= cost & left > 0L
+    if (!any(take)) break
+    out[take] <- move(out[take])
+    left[take] <- left[take] - cost[take]
+  }
+  out
+}
+
 .ra_widen_down <- function(v, steps) {
-  for (k in seq_len(steps)) v <- ra_pred(v)
-  v
+  .ra_widen_bounded(v, steps, ra_pred)
 }
 
 .ra_widen_up <- function(v, steps) {
-  for (k in seq_len(steps)) v <- ra_succ(v)
-  v
+  .ra_widen_bounded(v, steps, ra_succ)
 }
 
-## Enclose f at a vector of points. The fast path is a library call widened by
-## the declared slack; the rigorous path is a multiprecision evaluation crossed
-## back through the measured bridge. Non-finite arguments never reach the
-## backend: they are answered on the fast path, where the library already
-## returns the limit.
-##
-## The call is the ordinary one, on the whole vector, and that is a decision
-## rather than a default. R has more than one way to reach the system math
-## library and they do not all return the same bits: the byte-code compiler has
-## a shortcut for a call on a single value that was measured here to return the
-## correctly rounded sine of a small argument, while the ordinary path returns
-## the argument itself, one unit in the last place away. Reaching the shortcut
-## deliberately would mean writing code shaped to an undocumented internal, which
-## is the kind of dependency that stops holding without saying so. The package
-## therefore uses the documented path and measures its error rather than assuming
-## it; ra_measure_library_error() is that measurement, and gate 2 asserts the
-## declared slack covers it.
+## Enclose f at a vector of points. The fast path is the included correctly
+## rounded binary64 evaluator widened by the declared slack; the rigorous path
+## is a multiprecision evaluation crossed back through the measured bridge.
+## Non-finite arguments never reach the multiprecision backend: the included
+## evaluator supplies their limits and exceptional values before finite entries
+## are replaced by rigorous enclosures.
 .ra_eval_pts <- function(fun, v, level, precision) {
   if (identical(level, "fast") || !all(is.finite(v))) {
-    y <- do.call(fun, list(v))
+    y <- .ra_cr(fun, v)
     s <- ra_slack(fun)
     out <- list(lo = .ra_widen_down(y, s), hi = .ra_widen_up(y, s))
     if (identical(level, "fast")) return(out)
@@ -201,9 +208,10 @@
 #'   by [ra_operator_table()].
 #' @param x An object of class \code{ra_ivl}, or a numeric vector, which is
 #'   promoted to intervals of zero width.
-#' @param level A character scalar, \code{"fast"} for the system math library
-#'   widened by the declared slack, or \code{"rigorous"} for a multiprecision
-#'   evaluation. Defaults to \code{"fast"}.
+#' @param level A character scalar, \code{"fast"} for the included correctly
+#'   rounded binary64 implementation widened by the declared slack, or
+#'   \code{"rigorous"} for a multiprecision evaluation. Defaults to
+#'   \code{"fast"}.
 #' @param precision An integer scalar, the working precision in bits of the
 #'   rigorous level. Ignored at the fast level. Defaults to the first rung of
 #'   [ra_precision_ladder()].
@@ -233,6 +241,14 @@
 #'   the domain gives the empty interval. Neither case raises and neither
 #'   produces a missing value.
 #' @section Methodological notes:
+#'   The fast implementation consists of fifteen CORE-MATH software kernels and
+#'   the binary64 hardware square root. Its declared error bound is one half of
+#'   a unit in the last place, so the pre-registered formula
+#'   \code{ceiling(2 * e + 1)} applies two outward steps to every function. The
+#'   result retains measured provenance because the correctly rounded claim of
+#'   the included software was verified numerically and is not established here
+#'   as a theorem for every kernel.
+#'
 #'   The reduction that locates the interior extrema is performed in interval
 #'   arithmetic against an enclosure of pi, and the resulting interval of indices
 #'   is asked whether it contains an integer. That interval is a superset of the
@@ -249,9 +265,10 @@
 #'   is never a pole, because every pole is irrational and every double is not,
 #'   so the reduction is skipped there and the library value is used.
 #' @section Dependencies:
-#'   Base R at the fast level. The rigorous level requires 'Rmpfr', which is in
-#'   \code{Suggests}, and raises \code{ra_no_mpfr} when it is absent, since the
-#'   caller asked for it by name.
+#'   The fast level uses the package's registered native routines and has no
+#'   external package dependency. The rigorous level requires 'Rmpfr', which is
+#'   in \code{Suggests}, and raises \code{ra_no_mpfr} when it is absent, since
+#'   the caller asked for it by name.
 #' @references
 #'   Moore, R. E., Kearfott, R. B., & Cloud, M. J. (2009). Introduction to interval
 #'   analysis. Society for Industrial and Applied Mathematics.
@@ -261,10 +278,9 @@
 #'   interval arithmetic (simplified) (IEEE Std 1788.1-2017).
 #'   https://doi.org/10.1109/IEEESTD.2018.8277144
 #'
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 #' @examples
 #' ra_elem("exp", ra_interval(0, 1))
 #' ra_elem("sin", ra_interval(0, pi))
@@ -432,9 +448,9 @@ ra_verify_monotonicity <- function(classes = NULL, n = 4001L, span = 8) {
 
 #' @title Measure the error of the evaluation path the fast level actually uses
 #' @description Evaluates each admitted function over a mesh of its domain, both
-#'   through the ordinary path this package uses and through the multiprecision
+#'   through the included fast implementation and through the multiprecision
 #'   backend, and reports the largest disagreement in units in the last place
-#'   beside the error published for the system math library.
+#'   beside the bound declared for the included implementation.
 #' @param n An integer scalar, how many arguments to try per function. Defaults
 #'   to 20000.
 #' @param seed An integer scalar seeding the arguments, or \code{NULL}, the
@@ -446,34 +462,30 @@ ra_verify_monotonicity <- function(classes = NULL, n = 4001L, span = 8) {
 #'   \code{fun}, \code{n}, \code{observed}, \code{published}, \code{slack} and
 #'   \code{used}, the last being the observed error as a fraction of the slack.
 #' @details The slack of the fast level is \code{ceiling(2 * e + 1)} units in the
-#'   last place over the published error \code{e}, and the published figures are
-#'   measurements of the scalar routines of the system math library. R reaches
-#'   that library by more than one route and the routes were measured here not to
-#'   agree to the last bit, so the published figure is an anchor for a routine
-#'   and not a certificate for the path in use. This function measures the path
-#'   in use.
+#'   last place over the declared bound \code{e = 0.5}. The fifteen included
+#'   CORE-MATH kernels are correctly rounded under their contract, and the
+#'   binary64 hardware square root is correctly rounded under IEEE 754. This
+#'   function measures the installed package's path against an independent
+#'   multiprecision referent.
 #'
 #'   The error is computed in multiprecision and not in binary64. Computed in
-#'   binary64 it quantises to whole units in the last place, which is coarser
-#'   than every figure it exists to resolve: the published errors run from 0.500
-#'   to 2.21 and an instrument answering only 1 or 2 can see none of them.
+#'   binary64 it quantises to whole units in the last place, which cannot resolve
+#'   whether an observed disagreement lies below the half-unit bound.
 #' @section Methodological notes:
-#'   The figure returned is a lower bound found by sampling, exactly as the
-#'   published figures are lower bounds found by search. It is reported and never
-#'   used to set the slack: a slack fitted to an observed error would be a
-#'   calibration wearing the clothes of a convention, and the pre-registration of
-#'   this phase forbids widening a declared number to accommodate a measurement.
-#'   What the measurement is for is the opposite: to fail the gate if it ever
-#'   exceeds the slack, and to say how much of the slack is being spent so that a
-#'   snug one can be told from an absurd one.
+#'   The figure returned is a lower bound found by sampling. It is reported and
+#'   never used to set the slack: a slack fitted to an observed error would be a
+#'   calibration wearing the clothes of a convention, and the pre-registration
+#'   of this phase forbids widening a declared number to accommodate a
+#'   measurement. The measurement instead checks that the installed route stays
+#'   within its declared half-unit bound and reports how much of the two-step
+#'   slack is being spent.
 #' @section Dependencies:
 #'   Requires 'Rmpfr', which is in \code{Suggests}, and raises \code{ra_no_mpfr}
 #'   without it, since there is no referent to measure against.
 #' @references
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 #' @examples
 #' if (ra_has_mpfr()) {
 #'   head(ra_measure_library_error(n = 500L, seed = 80L), 4)
@@ -491,7 +503,7 @@ ra_measure_library_error <- function(n = 20000L, seed = NULL, bits = 300L) {
   }
   funs <- names(.ra_shape)
   out <- data.frame(fun = funs, n = 0L, observed = NA_real_,
-                    published = .ra_ulp_glibc[funs],
+                    published = .ra_ulp_fast[funs],
                     slack = vapply(funs, ra_slack, integer(1)),
                     used = NA_real_, row.names = NULL,
                     stringsAsFactors = FALSE)
@@ -507,7 +519,7 @@ ra_measure_library_error <- function(n = 20000L, seed = NULL, bits = 300L) {
     }
     x <- x[x > d$lo | (x == d$lo & !d$lo_open)]
     x <- x[x < d$hi | (x == d$hi & !d$hi_open)]
-    y <- do.call(f, list(x))
+    y <- .ra_cr(f, x)
     z <- do.call(f, list(Rmpfr::mpfr(x, bits)))
     u <- ra_succ(abs(y)) - abs(y)
     ok <- is.finite(y) & u > 0 & is.finite(u)

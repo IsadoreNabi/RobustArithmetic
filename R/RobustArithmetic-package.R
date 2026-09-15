@@ -1,4 +1,4 @@
-#' @title RobustArithmetic: verified interval arithmetic in pure R
+#' @title RobustArithmetic: verified interval arithmetic with correctly rounded kernels
 #' @description Interval arithmetic whose results are enclosures rather than
 #'   estimates: every operation returns a pair of endpoints that provably
 #'   contains the exact result, so that a conclusion drawn from them holds for
@@ -20,13 +20,15 @@
 #'   representation of the set-based flavor of the interval standard, with the
 #'   decoration subset the package declares.
 #'
-#'   The elementary functions come at two levels. The fast level evaluates in
-#'   the system math library and widens the result by a slack declared from
-#'   published accuracy measurements of that library on this platform. The
+#'   The elementary functions come at two levels. The fast level evaluates with
+#'   the correctly rounded binary64 implementation included in the package and
+#'   widens the result by the pre-registered slack of two outward steps. The
 #'   rigorous level evaluates in multiprecision, where every function is
 #'   correctly rounded by contract, and returns through a directed bridge; it is
 #'   reached by an escalation ladder when a verdict would otherwise fall inside
-#'   the slack of the fast level.
+#'   the slack of the fast level. The fast result retains measured provenance:
+#'   correct rounding of the included software has been verified numerically but
+#'   is not established here as a theorem for every kernel.
 #'
 #'   Above the kernel sit the natural and centered extensions of an expression,
 #'   a monotonicity test, the Hansen-Sengupta interval Newton operator with
@@ -39,9 +41,9 @@
 #'   \code{expm1}, \code{log1p}, \code{log2}, \code{log10}, \code{asin},
 #'   \code{acos}, and \code{atan} from CORE-MATH commit
 #'   \code{1ab68b70b90f807fd2bc9cf20ec295d49ae09592}. Square root uses the
-#'   binary64 hardware operation. The kernels are available to an internal
-#'   validation interface in this version; the fast interval level retains its
-#'   existing system-library path.
+#'   correctly rounded binary64 hardware operation. The fast interval level
+#'   evaluates through these sixteen kernels and applies two outward steps at
+#'   each finite endpoint.
 #' @section What the interval standard asks, and what this package answers:
 #'   Conformance with IEEE Std 1788.1-2017 is \strong{not} claimed, and the
 #'   reason is the standard's own. Its subclause 1.5 defines conformance as a

@@ -24,34 +24,31 @@ A data frame with one row per admitted function and the columns
 }
 \description{
 Evaluates each admitted function over a mesh of its domain, both
-  through the ordinary path this package uses and through the multiprecision
+  through the included fast implementation and through the multiprecision
   backend, and reports the largest disagreement in units in the last place
-  beside the error published for the system math library.
+  beside the bound declared for the included implementation.
 }
 \details{
 The slack of the fast level is \code{ceiling(2 * e + 1)} units in the
-  last place over the published error \code{e}, and the published figures are
-  measurements of the scalar routines of the system math library. R reaches
-  that library by more than one route and the routes were measured here not to
-  agree to the last bit, so the published figure is an anchor for a routine
-  and not a certificate for the path in use. This function measures the path
-  in use.
+  last place over the declared bound \code{e = 0.5}. The fifteen included
+  CORE-MATH kernels are correctly rounded under their contract, and the
+  binary64 hardware square root is correctly rounded under IEEE 754. This
+  function measures the installed package's path against an independent
+  multiprecision referent.
 
   The error is computed in multiprecision and not in binary64. Computed in
-  binary64 it quantises to whole units in the last place, which is coarser
-  than every figure it exists to resolve: the published errors run from 0.500
-  to 2.21 and an instrument answering only 1 or 2 can see none of them.
+  binary64 it quantises to whole units in the last place, which cannot resolve
+  whether an observed disagreement lies below the half-unit bound.
 }
 \section{Methodological notes}{
 
-  The figure returned is a lower bound found by sampling, exactly as the
-  published figures are lower bounds found by search. It is reported and never
-  used to set the slack: a slack fitted to an observed error would be a
-  calibration wearing the clothes of a convention, and the pre-registration of
-  this phase forbids widening a declared number to accommodate a measurement.
-  What the measurement is for is the opposite: to fail the gate if it ever
-  exceeds the slack, and to say how much of the slack is being spent so that a
-  snug one can be told from an absurd one.
+  The figure returned is a lower bound found by sampling. It is reported and
+  never used to set the slack: a slack fitted to an observed error would be a
+  calibration wearing the clothes of a convention, and the pre-registration
+  of this phase forbids widening a declared number to accommodate a
+  measurement. The measurement instead checks that the installed route stays
+  within its declared half-unit bound and reports how much of the two-step
+  slack is being spent.
 }
 
 \section{Dependencies}{
@@ -66,10 +63,9 @@ if (ra_has_mpfr()) {
 }
 }
 \references{
-Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-  Accuracy of mathematical functions in single, double, double extended, and
-  quadruple precision (edition of February 2026) [Technical report].
-  https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+  In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+  IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 }
 \seealso{
 [ra_slack()] and [ra_elem()].

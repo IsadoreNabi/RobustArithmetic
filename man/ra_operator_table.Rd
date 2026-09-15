@@ -21,14 +21,14 @@ For \code{"functions"}, a data frame with columns \code{fun},
 }
 \description{
 Returns the symbols this version of the package admits inside an
-  expression it is asked to enclose, together with the largest known error of
-  the system math library for each one and the slack the fast level adds on
+  expression it is asked to enclose, together with the error bound declared
+  by the included fast implementation and the slack the fast level adds on
   top of it.
 }
 \details{
 A symbol is admitted only if it satisfies four conditions at once,
-  all of them measured against the installed software rather than read from
-  documentation.
+  all of them checked against either the included implementation or the
+  installed software that supplies the remaining operation.
 
   The first is that the installed \code{stats::D} differentiates it, since
   the centered form and the monotonicity test both need a derivative and the
@@ -41,10 +41,10 @@ A symbol is admitted only if it satisfies four conditions at once,
   it is not a nuisance but a hole: the mean-value form leaves the table on
   its first step and there is nothing to evaluate.
 
-  The third is that a largest known error in units in the last place is
-  published for the system math library, since the fast level is a
-  library evaluation widened by a declared slack and a slack cannot be
-  declared over an unmeasured error.
+  The third is that the package includes a binary64 implementation with a
+  declared error bound in units in the last place. The fifteen CORE-MATH
+  kernels are correctly rounded, and the hardware square root is correctly
+  rounded by the floating-point standard, so the bound is 0.5 for each.
 
   The fourth is that the multiprecision backend provides the function with
   correct rounding, since otherwise the rigorous level and the escalation
@@ -52,28 +52,22 @@ A symbol is admitted only if it satisfies four conditions at once,
   be resolved.
 
   The slack is \code{ceiling(2 * e + 1)} units in the last place, where
-  \code{e} is the published error. The factor of two and the added unit
-  absorb two known gaps: the published figures for double precision are lower
-  bounds found by search rather than proven upper bounds, and the measured
-  build is not bit-for-bit the build installed here. The convention is named
-  and cited rather than tuned, and it is never widened to accommodate a
-  failing point; a point outside the slack is investigated instead.
+  \code{e = 0.5} is the declared correctly rounded bound. The result is two
+  outward steps for every function. The convention is named and cited rather
+  than tuned, and it is never widened to accommodate a failing point; a point
+  outside the slack is investigated instead.
 }
 \section{Methodological notes}{
 
-  The entry for \code{sqrt} is deliberately conservative. Correct rounding of
-  the square root is required by the floating-point standard, so a single
-  outward step provably encloses it and the published 0.500 is an upper bound
-  rather than a lower one. The table nonetheless applies the same convention
-  to it as to every other entry, so that no function carries a rule of its
-  own; the cost is one unit in the last place on an operation whose width is
-  negligible at the scales this package works at, and the benefit is a table
-  with no special cases to get wrong.
+  The entry for \code{sqrt} is deliberately uniform. Correct rounding of the
+  square root is required by the floating-point standard, so one outward step
+  would already enclose it. The table nonetheless applies the same
+  pre-registered formula and the same two steps as to every CORE-MATH kernel;
+  the benefit is a table with no function-specific slack rule to get wrong.
 
-  The error figures are Table 3, column GNU libc 2.43, of Gladman et al.
-  (2026), which is the report the documentation of the GNU C Library refers
-  to for its accuracy figures; the correct rounding of the square root is
-  clause 5.4.1 of IEEE Std 754-2019.
+  The correctly rounded contract of the software kernels is described by
+  Sibidanov et al. (2022); the correct rounding of square root is clause 5.4.1
+  of IEEE Std 754-2019.
 }
 
 \section{Dependencies}{
@@ -89,10 +83,9 @@ ra_operator_table("operators")
 head(ra_operator_table("excluded"), 3)
 }
 \references{
-Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-  Accuracy of mathematical functions in single, double, double extended, and
-  quadruple precision (edition of February 2026) [Technical report].
-  https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+  In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+  IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 
   Institute of Electrical and Electronics Engineers. (2019). IEEE standard for
   floating-point arithmetic (IEEE Std 754-2019).

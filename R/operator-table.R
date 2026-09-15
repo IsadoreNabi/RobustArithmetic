@@ -8,16 +8,15 @@
 ## with the table because a table whose reasons are not written down cannot be
 ## revisited when one of the four measurements changes.
 
-## Largest known error in units in the last place, binary64, round-to-nearest,
-## GNU libc 2.43, transcribed from Table 3 of the accuracy report cited in the
-## documentation below. The report states that for double precision these are
-## lower bounds located by a black-box search, not proven upper bounds; that is
-## the fact the slack convention exists to absorb.
-.ra_ulp_glibc <- c(
-  exp = 0.511, log = 0.520, sin = 0.516, cos = 0.516, tan = 0.619,
-  sinh = 1.93, cosh = 1.93, tanh = 2.21, sqrt = 0.500, expm1 = 0.913,
-  log1p = 0.899, log2 = 0.548, log10 = 1.62, asin = 0.516, acos = 0.523,
-  atan = 0.523
+## Declared error bound in units in the last place, binary64,
+## round-to-nearest. The fifteen software kernels are correctly rounded by the
+## contract of the included CORE-MATH implementation, and IEEE 754 requires the
+## same of square root. Correct rounding gives e = 0.5 for all sixteen.
+.ra_ulp_fast <- c(
+  exp = 0.5, log = 0.5, sin = 0.5, cos = 0.5, tan = 0.5,
+  sinh = 0.5, cosh = 0.5, tanh = 0.5, sqrt = 0.5, expm1 = 0.5,
+  log1p = 0.5, log2 = 0.5, log10 = 0.5, asin = 0.5, acos = 0.5,
+  atan = 0.5
 )
 
 ## Binary operators, unary sign and grouping. These carry no slack: the exact
@@ -33,7 +32,7 @@
   digamma = "C4: its derivative is trigamma, which the installed Rmpfr does not provide.",
   trigamma = "C4: not provided by the installed Rmpfr.",
   psigamma = "C4: not provided by the installed Rmpfr, and its derivatives raise the polygamma order without bound, so no finite set of symbols closes the family.",
-  pnorm = "C3: no published error bound applies. R computes pnorm in its own numerical library rather than in the system math library, so the accuracy report says nothing about it, and a slack cannot be declared from a number that was never measured.",
+  pnorm = "C3: no included correctly rounded binary64 kernel or declared error bound applies to pnorm, so a slack cannot be declared for it.",
   dnorm = "C3: same as pnorm.",
   abs = "C1: the installed stats::D does not differentiate it, and its derivative does not exist at zero. The interval operation abs() is provided in the kernel; what is refused is its appearance inside a differentiable expression.",
   sign = "C1: not in the derivative table of the installed stats::D.",
@@ -52,8 +51,8 @@
 
 #' @title The closed table of symbols an expression may use
 #' @description Returns the symbols this version of the package admits inside an
-#'   expression it is asked to enclose, together with the largest known error of
-#'   the system math library for each one and the slack the fast level adds on
+#'   expression it is asked to enclose, together with the error bound declared
+#'   by the included fast implementation and the slack the fast level adds on
 #'   top of it.
 #' @param what A character scalar choosing what to return: \code{"functions"}
 #'   for the unary functions with their errors and slacks, \code{"operators"}
@@ -65,8 +64,8 @@
 #'   For \code{"excluded"}, a data frame with columns \code{symbol} and
 #'   \code{reason}. For \code{"all"}, a named list with all three.
 #' @details A symbol is admitted only if it satisfies four conditions at once,
-#'   all of them measured against the installed software rather than read from
-#'   documentation.
+#'   all of them checked against either the included implementation or the
+#'   installed software that supplies the remaining operation.
 #'
 #'   The first is that the installed \code{stats::D} differentiates it, since
 #'   the centered form and the monotonicity test both need a derivative and the
@@ -79,10 +78,10 @@
 #'   it is not a nuisance but a hole: the mean-value form leaves the table on
 #'   its first step and there is nothing to evaluate.
 #'
-#'   The third is that a largest known error in units in the last place is
-#'   published for the system math library, since the fast level is a
-#'   library evaluation widened by a declared slack and a slack cannot be
-#'   declared over an unmeasured error.
+#'   The third is that the package includes a binary64 implementation with a
+#'   declared error bound in units in the last place. The fifteen CORE-MATH
+#'   kernels are correctly rounded, and the hardware square root is correctly
+#'   rounded by the floating-point standard, so the bound is 0.5 for each.
 #'
 #'   The fourth is that the multiprecision backend provides the function with
 #'   correct rounding, since otherwise the rigorous level and the escalation
@@ -90,34 +89,27 @@
 #'   be resolved.
 #'
 #'   The slack is \code{ceiling(2 * e + 1)} units in the last place, where
-#'   \code{e} is the published error. The factor of two and the added unit
-#'   absorb two known gaps: the published figures for double precision are lower
-#'   bounds found by search rather than proven upper bounds, and the measured
-#'   build is not bit-for-bit the build installed here. The convention is named
-#'   and cited rather than tuned, and it is never widened to accommodate a
-#'   failing point; a point outside the slack is investigated instead.
+#'   \code{e = 0.5} is the declared correctly rounded bound. The result is two
+#'   outward steps for every function. The convention is named and cited rather
+#'   than tuned, and it is never widened to accommodate a failing point; a point
+#'   outside the slack is investigated instead.
 #' @section Methodological notes:
-#'   The entry for \code{sqrt} is deliberately conservative. Correct rounding of
-#'   the square root is required by the floating-point standard, so a single
-#'   outward step provably encloses it and the published 0.500 is an upper bound
-#'   rather than a lower one. The table nonetheless applies the same convention
-#'   to it as to every other entry, so that no function carries a rule of its
-#'   own; the cost is one unit in the last place on an operation whose width is
-#'   negligible at the scales this package works at, and the benefit is a table
-#'   with no special cases to get wrong.
+#'   The entry for \code{sqrt} is deliberately uniform. Correct rounding of the
+#'   square root is required by the floating-point standard, so one outward step
+#'   would already enclose it. The table nonetheless applies the same
+#'   pre-registered formula and the same two steps as to every CORE-MATH kernel;
+#'   the benefit is a table with no function-specific slack rule to get wrong.
 #'
-#'   The error figures are Table 3, column GNU libc 2.43, of Gladman et al.
-#'   (2026), which is the report the documentation of the GNU C Library refers
-#'   to for its accuracy figures; the correct rounding of the square root is
-#'   clause 5.4.1 of IEEE Std 754-2019.
+#'   The correctly rounded contract of the software kernels is described by
+#'   Sibidanov et al. (2022); the correct rounding of square root is clause 5.4.1
+#'   of IEEE Std 754-2019.
 #' @section Dependencies:
 #'   Uses \code{stats::D} to close the table, and probes 'Rmpfr' from
 #'   \code{Suggests} for the fourth criterion.
 #' @references
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 #'
 #'   Institute of Electrical and Electronics Engineers. (2019). IEEE standard for
 #'   floating-point arithmetic (IEEE Std 754-2019).
@@ -133,9 +125,9 @@ ra_operator_table <- function(what = c("functions", "operators", "excluded",
                                        "all")) {
   what <- match.arg(what)
   funs <- data.frame(
-    fun = names(.ra_ulp_glibc),
-    ulp = unname(.ra_ulp_glibc),
-    slack = ceiling(2 * unname(.ra_ulp_glibc) + 1),
+    fun = names(.ra_ulp_fast),
+    ulp = unname(.ra_ulp_fast),
+    slack = ceiling(2 * unname(.ra_ulp_fast) + 1),
     stringsAsFactors = FALSE
   )
   excl <- data.frame(
@@ -157,8 +149,9 @@ ra_operator_table <- function(what = c("functions", "operators", "excluded",
 #'   every rounded operation already receives.
 #' @param fun A character scalar naming a function of the closed table.
 #' @return An integer scalar, the number of steps.
-#' @details The value is \code{ceiling(2 * e + 1)} for the published error
-#'   \code{e} of the named function. Asking for a symbol outside the table
+#' @details The value is \code{ceiling(2 * e + 1)} for the declared correctly
+#'   rounded bound \code{e = 0.5} of the named function, hence two steps for
+#'   every admitted function. Asking for a symbol outside the table
 #'   raises \code{ra_symbol_not_in_table} rather than returning a default,
 #'   because a default here would be a number chosen by nobody and applied to
 #'   everything the table forgot.
@@ -169,14 +162,19 @@ ra_operator_table <- function(what = c("functions", "operators", "excluded",
 #'   response is to investigate the point, not to enlarge the number until the
 #'   point falls inside.
 #'
-#'   The published figures are Table 3 of Gladman et al. (2026).
+#'   The bound for the fifteen software kernels follows from the correctly
+#'   rounded contract described by Sibidanov et al. (2022). Square root follows
+#'   the corresponding requirement of IEEE Std 754-2019.
 #' @section Dependencies:
 #'   Base R only.
 #' @references
-#'   Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-#'   Accuracy of mathematical functions in single, double, double extended, and
-#'   quadruple precision (edition of February 2026) [Technical report].
-#'   https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
+#'
+#'   Institute of Electrical and Electronics Engineers. (2019). IEEE standard for
+#'   floating-point arithmetic (IEEE Std 754-2019).
+#'   https://doi.org/10.1109/IEEESTD.2019.8766229
 #' @examples
 #' ra_slack("exp")
 #' ra_slack("tanh")
@@ -187,7 +185,7 @@ ra_slack <- function(fun) {
   if (!is.character(fun) || length(fun) != 1L || is.na(fun)) {
     ra_stop("bad_argument", "`fun` must be a single character string.")
   }
-  if (!fun %in% names(.ra_ulp_glibc)) {
+  if (!fun %in% names(.ra_ulp_fast)) {
     reason <- if (!is.null(.ra_excluded[[fun]])) {
       paste0(" It is refused for a stated reason. ", .ra_excluded[[fun]])
     } else {
@@ -199,13 +197,13 @@ ra_slack <- function(fun) {
                    " See ra_operator_table() for what is admitted."),
             symbol = fun)
   }
-  as.integer(ceiling(2 * .ra_ulp_glibc[[fun]] + 1))
+  as.integer(ceiling(2 * .ra_ulp_fast[[fun]] + 1))
 }
 
 #' @title Re-close the table against the installed software
-#' @description Runs the admission criteria again, here and now, against the
-#'   derivative engine and the multiprecision backend of the machine the package
-#'   is running on, and reports what it found.
+#' @description Runs the admission criteria that depend on installed software
+#'   again, here and now, against the derivative engine and the multiprecision
+#'   backend of the machine the package is running on, and reports what it found.
 #' @param include_mpfr A logical scalar saying whether to test the fourth
 #'   criterion, which needs the optional backend. Defaults to whether the
 #'   backend is installed.
@@ -217,12 +215,12 @@ ra_slack <- function(fun) {
 #'   or \code{NULL} when the fourth criterion was not tested.
 #'   \code{closed} is a logical scalar, \code{TRUE} when the first three are all
 #'   empty.
-#' @details The table in the sources is a transcription of measurements taken on
-#'   one machine on one day. The software underneath it moves: a release of R
-#'   can add a rule to the derivative table, and a release of the backend can
-#'   implement a function it did not have. This function exists so that the
-#'   transcription can be audited rather than trusted, by whoever is running the
-#'   package and not only by whoever wrote it.
+#' @details The derivative engine and multiprecision backend underneath the
+#'   table can move: a release of R can add a rule to the derivative table, and a
+#'   release of the backend can implement a function it did not have. The
+#'   correctly rounded fast kernels travel with the package and are tested
+#'   separately. This function rechecks the moving criteria so that they are
+#'   audited rather than trusted by whoever runs the package.
 #'
 #'   The closure is computed over head symbols rather than over whole
 #'   expressions, which is what makes it terminate. Differentiating a function
@@ -254,7 +252,7 @@ ra_slack <- function(fun) {
 #' @seealso [ra_operator_table()].
 #' @export
 ra_verify_operator_table <- function(include_mpfr = ra_has_mpfr()) {
-  admitted <- names(.ra_ulp_glibc)
+  admitted <- names(.ra_ulp_fast)
 
   symbols_of <- function(e, acc = character(0)) {
     if (is.call(e)) {

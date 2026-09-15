@@ -18,8 +18,9 @@ Returns the number of outward rounding steps the fast level adds
   every rounded operation already receives.
 }
 \details{
-The value is \code{ceiling(2 * e + 1)} for the published error
-  \code{e} of the named function. Asking for a symbol outside the table
+The value is \code{ceiling(2 * e + 1)} for the declared correctly
+  rounded bound \code{e = 0.5} of the named function, hence two steps for
+  every admitted function. Asking for a symbol outside the table
   raises \code{ra_symbol_not_in_table} rather than returning a default,
   because a default here would be a number chosen by nobody and applied to
   everything the table forgot.
@@ -32,7 +33,9 @@ The value is \code{ceiling(2 * e + 1)} for the published error
   response is to investigate the point, not to enlarge the number until the
   point falls inside.
 
-  The published figures are Table 3 of Gladman et al. (2026).
+  The bound for the fifteen software kernels follows from the correctly
+  rounded contract described by Sibidanov et al. (2022). Square root follows
+  the corresponding requirement of IEEE Std 754-2019.
 }
 
 \section{Dependencies}{
@@ -46,10 +49,13 @@ ra_slack("tanh")
 tryCatch(ra_slack("gamma"), ra_symbol_not_in_table = function(cnd) "refused")
 }
 \references{
-Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-  Accuracy of mathematical functions in single, double, double extended, and
-  quadruple precision (edition of February 2026) [Technical report].
-  https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+  In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+  IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
+
+  Institute of Electrical and Electronics Engineers. (2019). IEEE standard for
+  floating-point arithmetic (IEEE Std 754-2019).
+  https://doi.org/10.1109/IEEESTD.2019.8766229
 }
 \seealso{
 [ra_operator_table()].

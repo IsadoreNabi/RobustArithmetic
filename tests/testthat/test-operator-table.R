@@ -92,17 +92,13 @@ test_that("C2, one function at a time, so a future failure names the culprit", {
   }
 })
 
-test_that("C3: every admitted function carries its published error and its slack", {
+test_that("C3: every admitted function carries the included bound and its slack", {
   tab <- ra_operator_table()
   expect_true(all(is.finite(tab$ulp)))
-  expect_true(all(tab$ulp >= 0.5))
+  expect_true(all(tab$ulp == 0.5))
   expect_identical(tab$slack, ceiling(2 * tab$ulp + 1))
-  expect_identical(ra_slack("exp"), 3L)
-  expect_identical(ra_slack("tanh"), 6L)
-  expect_identical(ra_slack("sinh"), 5L)
-  expect_identical(ra_slack("cosh"), 5L)
-  expect_identical(ra_slack("log10"), 5L)
-  expect_identical(ra_slack("sqrt"), 2L)
+  expect_identical(vapply(tab$fun, ra_slack, integer(1)),
+                   stats::setNames(rep(2L, nrow(tab)), tab$fun))
 })
 
 test_that("C4: the backend provides every admitted function, which is why the ladder can climb", {
@@ -140,7 +136,7 @@ test_that("asking for a symbol outside the table is refused by name, not default
   expect_error(ra_slack("gamma"), class = "ra_symbol_not_in_table")
   expect_error(ra_slack("nonesuch"), class = "ra_symbol_not_in_table")
   msg <- tryCatch(ra_slack("pnorm"), ra_symbol_not_in_table = conditionMessage)
-  expect_match(msg, "no published error bound applies", fixed = TRUE)
+  expect_match(msg, "no included correctly rounded binary64 kernel", fixed = TRUE)
   expect_error(ra_slack(c("exp", "log")), class = "ra_bad_argument")
 })
 

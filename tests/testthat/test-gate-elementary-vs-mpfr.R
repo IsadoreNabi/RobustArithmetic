@@ -1,8 +1,9 @@
 ## GATE 2 -- the elementary layer against multiprecision evaluation.
 ##
-## The fast level of an elementary function is a library call widened by a slack
-## that was declared from a published error and never tuned. Two things have to
-## be true of it, and they are different claims tested differently.
+## The fast level of an elementary function is an included correctly rounded
+## binary64 evaluation widened by a slack declared from its half-unit bound and
+## never tuned. Two things have to be true of it, and they are different claims
+## tested differently.
 ##
 ## The first is containment at a point: the correctly rounded value of the
 ## function must lie inside the enclosure of the point interval. That tests the
@@ -13,8 +14,8 @@
 ## search for interior extrema, which the point test cannot reach, and it is
 ## where reading only the endpoints of a periodic function would be caught.
 ##
-## The third figure is not a claim but a measurement: how much of the declared
-## slack the library actually spends. A gate that passes without saying by how
+## The third figure is a measurement: how much of the declared slack the
+## included route actually spends. A gate that passes without saying by how
 ## much cannot tell a slack that is snug from one that is absurd, so the margin
 ## is computed and printed. It is never used to change the slack; the
 ## pre-registration in dev/PREREGISTRO_FASE_2.md forbids that, and a point
@@ -69,24 +70,9 @@ gate2_reference <- function(fun, x, bits = gate2_bits) {
   list(lo = ra_to_double(y, "down"), hi = ra_to_double(y, "up"), mpfr = y)
 }
 
-## The correctly rounded value: whichever of the two bracketing doubles is
-## nearer the exact one, decided in multiprecision because deciding it in
-## binary64 is deciding it with the instrument under test.
-gate2_nearest <- function(ref, bits = gate2_bits) {
-  lo <- Rmpfr::mpfr(ref$lo, bits)
-  hi <- Rmpfr::mpfr(ref$hi, bits)
-  take_hi <- as.logical((ref$mpfr - lo) > (hi - ref$mpfr))
-  out <- ref$lo
-  take_hi[is.na(take_hi)] <- FALSE
-  out[take_hi] <- ref$hi[take_hi]
-  out
-}
-
-## The error of a library value against the exact one, in units in the last
+## The error of a binary64 value against the exact one, in units in the last
 ## place, computed in multiprecision. Computing it in binary64 quantises it to
-## whole units, which is coarser than every figure it is meant to resolve: the
-## published errors run from 0.500 to 2.21, and an instrument that can only
-## answer 1 or 2 cannot see any of them.
+## whole units and cannot resolve the declared half-unit bound.
 gate2_ulp_error <- function(y, ref, bits = gate2_bits) {
   u <- ra_succ(abs(y)) - abs(y)
   ok <- is.finite(y) & u > 0 & is.finite(u)
@@ -104,7 +90,7 @@ test_that("GATE 2A: the correctly rounded value is inside the fast enclosure", {
   n <- as.integer(Sys.getenv("RA_GATE2_N", "1000000"))
   funs <- ra_operator_table()$fun
   report <- data.frame(fun = funs, n = 0L, e_obs = NA_real_,
-                       e_pub = ra_operator_table()$ulp,
+                       e_bound = ra_operator_table()$ulp,
                        slack = vapply(funs, ra_slack, integer(1)),
                        used = NA_real_, stringsAsFactors = FALSE)
 
@@ -125,7 +111,8 @@ test_that("GATE 2A: the correctly rounded value is inside the fast enclosure", {
       bad <- ra_inf(enc) > ref$lo | ra_sup(enc) < ref$hi
       bad[is.na(bad)] <- TRUE
       outside <- outside + sum(bad)
-      err <- gate2_ulp_error(do.call(f, list(xs)), ref)
+      evaluator <- get(".ra_cr", envir = asNamespace("RobustArithmetic"))
+      err <- gate2_ulp_error(evaluator(f, xs), ref)
       if (any(!is.na(err))) worst <- max(worst, max(err, na.rm = TRUE),
                                          na.rm = TRUE)
     }
@@ -139,27 +126,26 @@ test_that("GATE 2A: the correctly rounded value is inside the fast enclosure", {
     report$used[i] <- worst / report$slack[i]
   }
 
-  cat("\nGATE 2 observed error of the evaluation path in use, in ulps,",
-      "against the published figure and the declared slack:\n")
+  cat("\nGATE 2 observed error of the included evaluation path, in ulps,",
+      "against its declared bound and slack:\n")
   print(report, row.names = FALSE, digits = 4)
   tight <- report$fun[!is.na(report$used) & report$used > 0.80]
   cat("Slacks the sweep found tight (used above 0.80): ",
       if (length(tight)) paste(tight, collapse = ", ") else "none", "\n",
       sep = "")
-  above <- report$fun[!is.na(report$e_obs) & report$e_obs > report$e_pub]
-  cat("Functions where the path in use exceeded the published scalar figure: ",
+  above <- report$fun[!is.na(report$e_obs) &
+                        report$e_obs > report$e_bound]
+  cat("Functions where the included path exceeded its declared bound: ",
       if (length(above)) paste(above, collapse = ", ") else "none", "\n",
       sep = "")
-  ## reading 1 of the pre-registration: the observed error never exceeds the
-  ## slack, which is the same statement as containment, said in ulps
+  ## The included route must respect both its half-unit bound and the wider
+  ## enclosure budget.
+  expect_true(all(is.na(report$e_obs) | report$e_obs <= report$e_bound))
   expect_true(all(is.na(report$e_obs) | report$e_obs <= report$slack))
-  ## reading 2: exceeding the published figure is a finding and not a failure,
-  ## and the two must not be confused. The figure above is the margin over the
-  ## very points this gate asserted containment on; the exported measurement is
-  ## a standalone instrument over its own mesh, and it has to reach the same
-  ## verdict about the slack or one of the two is measuring something else.
+  ## The exported measurement is a standalone instrument over its own mesh, and
+  ## it has to reach the same verdict about the declared bound.
   m <- ra_measure_library_error(n = 5000L, seed = 80L)
-  expect_true(all(is.na(m$observed) | m$observed <= m$slack))
+  expect_true(all(!is.na(m$observed) & m$observed <= 0.5))
 })
 
 test_that("GATE 2B: every point of a box is inside the enclosure of the box", {
@@ -206,75 +192,46 @@ test_that("GATE 2B: every point of a box is inside the enclosure of the box", {
   }
 })
 
-test_that("CP-1: the sweep finds points where the library is not correctly rounded", {
-  ## If the library agreed with the correctly rounded value everywhere on the
-  ## mesh, gate 2A would be passing for the wrong reason and the slack would
-  ## never be exercised. The gate is only meaningful if such points exist, so
-  ## their existence is asserted rather than assumed.
+test_that("CP-1: the included evaluator respects its half-unit bound", {
   skip_on_cran()
   skip_if_not(ra_has_mpfr(), "the control needs Rmpfr")
 
-  counts <- integer(0)
+  evaluator <- get(".ra_cr", envir = asNamespace("RobustArithmetic"))
+  maxima <- numeric(0)
   for (f in ra_operator_table()$fun) {
     x <- gate2_points(f, 20000L, seed = 2600L + nchar(f) * 7L)
     ref <- gate2_reference(f, x)
-    y <- do.call(f, list(x))
-    ## not correctly rounded means the library value is not the nearer of the
-    ## two doubles bracketing the exact one, which is a half-unit question and
-    ## has to be decided in multiprecision
-    near <- gate2_nearest(ref)
-    off <- is.finite(y) & is.finite(near) & y != near
-    counts[f] <- sum(off)
-    if (any(off)) {
-      ## and every such point is inside the fast enclosure, which is the claim
-      xi <- x[off]
-      enc <- ra_elem(f, ra_interval(xi, xi))
-      ri <- gate2_reference(f, xi)
-      expect_true(all(ra_inf(enc) <= ri$lo & ra_sup(enc) >= ri$hi),
-                  label = paste0("CP-1 ", f, ": the mis-rounded points are ",
-                                 "still enclosed (", sum(off), " of them)"))
-    }
+    err <- gate2_ulp_error(evaluator(f, x), ref)
+    maxima[f] <- max(err, na.rm = TRUE)
+    expect_true(all(is.na(err) | err <= 0.5),
+                label = paste0("CP-1 ", f, ": declared bound"))
   }
-  cat("\nCP-1 mis-rounded points found on the mesh, by function:\n")
-  print(counts)
-  ## the control fires if the library is imperfect somewhere; a mesh on which
-  ## it were perfect everywhere would make gate 2A pass for the wrong reason
-  expect_true(sum(counts) > 0L)
+  cat("\nCP-1 maximum errors of the included evaluator, by function:\n")
+  print(maxima)
 })
 
-test_that("CP-2: a slack of zero must break containment on the same data", {
-  ## The symmetric control, and the one that proves the harness can fail. With
-  ## the slack removed the enclosure is the library value bracketed by one
-  ## outward step, which cannot cover an error above one unit in the last place.
+test_that("CP-2: an injected error beyond the slack breaks containment", {
+  ## This control proves that the containment comparison can fail. The injected
+  ## evaluator is four successors above the included result, while the declared
+  ## enclosure budget returns only two steps toward the exact value.
   skip_on_cran()
   skip_if_not(ra_has_mpfr(), "the control needs Rmpfr")
 
-  ns <- asNamespace("RobustArithmetic")
-  old <- get(".ra_ulp_glibc", envir = ns)
-  unlockBinding(".ra_ulp_glibc", ns)
-  on.exit({
-    assign(".ra_ulp_glibc", old, envir = ns)
-    lockBinding(".ra_ulp_glibc", ns)
-  }, add = TRUE)
+  evaluator <- get(".ra_cr", envir = asNamespace("RobustArithmetic"))
+  x <- seq(0.1, 1, length.out = 2001L)
+  ref <- gate2_reference("sin", x)
+  clean_enc <- ra_elem("sin", ra_interval(x, x))
+  clean <- sum(ra_inf(clean_enc) > ref$lo | ra_sup(clean_enc) < ref$hi)
 
-  violations <- 0L
-  clean <- 0L
-  for (f in c("tanh", "sinh", "cosh", "log10")) {
-    x <- gate2_points(f, 50000L, seed = 3100L + nchar(f))
-    ref <- gate2_reference(f, x)
-
-    assign(".ra_ulp_glibc", old, envir = ns)
-    enc_ok <- ra_elem(f, ra_interval(x, x))
-    clean <- clean + sum(ra_inf(enc_ok) > ref$lo | ra_sup(enc_ok) < ref$hi,
-                         na.rm = TRUE)
-
-    zeroed <- old
-    zeroed[f] <- 0
-    assign(".ra_ulp_glibc", zeroed, envir = ns)
-    enc_bad <- ra_elem(f, ra_interval(x, x))
-    violations <- violations + sum(ra_inf(enc_bad) > ref$lo |
-                                     ra_sup(enc_bad) < ref$hi, na.rm = TRUE)
+  shifted <- evaluator("sin", x)
+  for (k in seq_len(4L)) shifted <- ra_succ(shifted)
+  bad_lo <- shifted
+  bad_hi <- shifted
+  for (k in seq_len(2L)) {
+    bad_lo <- ra_pred(bad_lo)
+    bad_hi <- ra_succ(bad_hi)
   }
+  violations <- sum(bad_lo > ref$lo | bad_hi < ref$hi)
   expect_gt(violations, 0L)
   expect_identical(clean, 0L)
 })

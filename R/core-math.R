@@ -1,8 +1,8 @@
 #' Evaluate a vendored correctly rounded elementary function
 #'
 #' Evaluate one of the package's sixteen binary64 elementary-function kernels.
-#' This internal interface supports validation of the vendored implementation;
-#' the package's fast interval level does not call it yet.
+#' This internal interface is the evaluator used by the package's fast interval
+#' level and also supports direct validation of the included implementation.
 #'
 #' @param fun A character scalar naming one of `exp`, `log`, `sin`, `cos`,
 #'   `tan`, `sinh`, `cosh`, `tanh`, `sqrt`, `expm1`, `log1p`, `log2`, `log10`,
@@ -30,8 +30,8 @@
 #'   In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
 #'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 #'
-#' @seealso [ra_elem()] for the public interval interface that remains on its
-#'   existing evaluation path in this integration unit.
+#' @seealso [ra_elem()] for the public interval interface that uses this
+#'   evaluator at the fast level.
 #' @noRd
 .ra_cr <- function(fun, x) {
   if (!is.character(fun) || length(fun) != 1L || is.na(fun)) {

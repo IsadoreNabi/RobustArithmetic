@@ -118,6 +118,7 @@ test_that("the exact extrema carry no slack", {
 test_that("a point interval is enclosed by its own evaluation widened by slack", {
   restore_fast_level <- hold_fast_level_open()
   on.exit(restore_fast_level(), add = TRUE)
+  evaluator <- get(".ra_cr", envir = asNamespace("RobustArithmetic"))
   for (f in ra_operator_table()$fun) {
     v <- switch(f,
                 log = , log2 = , log10 = , sqrt = 0.7,
@@ -125,7 +126,7 @@ test_that("a point interval is enclosed by its own evaluation widened by slack",
                 asin = , acos = 0.4,
                 0.3)
     got <- ra_elem(f, ra_interval(v, v))
-    y <- do.call(f, list(v))
+    y <- evaluator(f, v)
     expect_true(ra_inf(got) <= y && ra_sup(got) >= y,
                 label = paste0(f, " encloses its own evaluation"))
     ## the width is the slack, spent in both directions and no more
@@ -141,12 +142,26 @@ test_that("a point interval is enclosed by its own evaluation widened by slack",
   }
 })
 
+test_that("the fast slack never exceeds its exact-neighbour budget", {
+  ## ra_pred() and ra_succ() may each move two neighbours in the two binades
+  ## around the subnormal threshold. The elementary widener accounts for that
+  ## looseness instead of applying the formula twice and silently spending four
+  ## neighbours from a declared budget of two.
+  y <- c(0, 1, -1, 2^-1022, -2^-1022, 2^-1021, -2^-1021,
+         ra_pred(2^-1022), ra_succ(2^-1020))
+  p2 <- ra_next_down_bits(ra_next_down_bits(y))
+  s2 <- ra_next_up_bits(ra_next_up_bits(y))
+  lo <- .ra_widen_down(y, 2L)
+  hi <- .ra_widen_up(y, 2L)
+  expect_true(all(lo >= p2 & lo <= y))
+  expect_true(all(hi <= s2 & hi >= y))
+})
+
 test_that("the enclosure does not depend on how many intervals were passed", {
   restore_fast_level <- hold_fast_level_open()
   on.exit(restore_fast_level(), add = TRUE)
-  ## R reaches the system math library by more than one route and the routes
-  ## were measured not to agree to the last bit. An enclosure that changed with
-  ## the batch size would be wrong in a way nothing printed would show, so the
+  ## The included evaluator accepts vectors. An enclosure that changed with the
+  ## batch size would be wrong in a way nothing printed would show, so the
   ## invariant is asserted rather than assumed to follow from the code.
   set.seed(80L)
   x <- c(2.5698953698477605e-08, 1e-9, 0.3, 2.7, -1.4891097021325252e-08,
@@ -160,45 +175,40 @@ test_that("the enclosure does not depend on how many intervals were passed", {
   }
 })
 
-test_that("the evaluation path in use is not the correctly rounded one", {
-  ## This is the reason the slack is measured against the path in use instead
-  ## of taken from the publication. At this argument the system math library,
-  ## called from C, returns the correctly rounded sine; R returns the argument
-  ## itself, one unit in the last place away in the environment recorded by
-  ## the anchor. The mathematical and containment claims below remain valid in
-  ## every environment; only the machine claim is conditional on a match.
+test_that("the fast path uses the included correctly rounded evaluator", {
+  ## This argument distinguished the previous route from the correctly rounded
+  ## result in the environment where the package was developed. The property
+  ## asserted here belongs to the code: the included evaluator returns the
+  ## independently computed nearest value and the public fast enclosure
+  ## contains it.
   skip_if_not(ra_has_mpfr(), "the referent needs Rmpfr")
   x <- 2.5698953698477605e-08
   exact <- Rmpfr::mpfr(x, 300L)
   z <- base::sin(exact)
   correct <- ra_to_double(z, "down")
   expect_identical(correct, ra_to_double(z, "up") - 2^-78)
-  if (!length(ra_environment_anchor()$mismatch)) {
-    expect_false(identical(sin(x), correct))
-  }
-  ## and the enclosure holds both, which is the claim that matters
+  evaluator <- get(".ra_cr", envir = asNamespace("RobustArithmetic"))
+  expect_identical(evaluator("sin", x), correct)
   enc <- ra_elem("sin", ra_interval(x, x))
   expect_true(ra_inf(enc) <= correct && ra_sup(enc) >= correct)
-  expect_true(ra_inf(enc) <= sin(x) && ra_sup(enc) >= sin(x))
 })
 
-test_that("the error of the path in use is measured against the publication", {
+test_that("the error of the included path is measured against its declared bound", {
   skip_if_not(ra_has_mpfr(), "the measurement needs Rmpfr")
   m <- ra_measure_library_error(n = 3000L, seed = 80L)
   expect_identical(nrow(m), 16L)
   expect_true(all(c("observed", "published", "slack", "used") %in% names(m)))
-  ## The claim -- that the declared slack covers what the path in use actually
-  ## does -- is a claim about THIS MACHINE, and the slack was measured on
-  ## another one. So it is asserted where it can be true, and where it cannot,
-  ## what is asserted instead is the thing that must never fail: that the
-  ## package NOTICED. A library that breaks the published bound and a package
-  ## that does not say so is the only outcome this test exists to forbid.
-  covers <- all(is.na(m$observed) | m$observed <= m$slack)
-  if (covers) {
-    expect_true(covers)
-  } else {
-    suppressWarnings(try(ra_elem("exp", ra_interval(0, 1)), silent = TRUE))
+  expect_true(all(m$published == 0.5))
+  expect_identical(m$slack, rep(2L, 16L))
+  ## The permanent scenario harness deliberately replaces this instrument in
+  ## its Windows emulation so that the degradation gate can be exercised. In
+  ## every ordinary run, including a real Windows run, the included evaluator
+  ## itself must remain within the half-unit bound.
+  if (identical(Sys.getenv("RA_SCENARIO"), "windows")) {
+    expect_true(any(!is.na(m$observed) & m$observed > m$slack))
     expect_true(isTRUE(.ra_state$fast_degraded))
+  } else {
+    expect_true(all(!is.na(m$observed) & m$observed <= 0.5))
   }
   ## and the measurement resolves fractions of a unit, which is what it is for
   expect_true(any(!is.na(m$observed) & m$observed %% 1 != 0))
@@ -223,10 +233,12 @@ test_that("a symbol outside the closed table is refused by name", {
 test_that("the elementary layer is vectorised over intervals", {
   restore_fast_level <- hold_fast_level_open()
   on.exit(restore_fast_level(), add = TRUE)
+  evaluator <- get(".ra_cr", envir = asNamespace("RobustArithmetic"))
   x <- c(ra_interval(0, 1), ra_interval(2, 3), ra_empty())
   got <- ra_elem("exp", x)
   expect_identical(length(got), 3L)
-  expect_true(ra_inf(got)[1] <= 1 && ra_sup(got)[1] >= exp(1))
+  expect_true(ra_inf(got)[1] <= 1 &&
+                ra_sup(got)[1] >= evaluator("exp", 1))
   expect_true(ra_is_empty(got)[3])
 })
 
@@ -260,9 +272,9 @@ test_that("CP-7: the ladder resolves what the fast level cannot, and abstains at
   on.exit(restore_fast_level(), add = TRUE)
 
   ## A question the fast level cannot settle: an enclosure of sin(1) narrower
-  ## than one unit in the last place. The fast level spends three slack steps
-  ## per side and so returns six, and no amount of slack can be undone; the
-  ## rigorous level returns one by theorem.
+  ## than one unit in the last place. The fast level spends two slack steps per
+  ## side, and no amount of slack can be undone; the rigorous level returns one
+  ## by theorem.
   decide <- function(iv) ra_wid(iv) < 2^-52
   fast <- ra_elem("sin", ra_interval(1, 1))
   expect_false(decide(fast))

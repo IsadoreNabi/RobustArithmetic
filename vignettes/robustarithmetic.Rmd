@@ -1,8 +1,8 @@
 ---
-title: "Verified interval arithmetic in pure R"
+title: "Verified interval arithmetic with correctly rounded kernels"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Verified interval arithmetic in pure R}
+  %\VignetteIndexEntry{Verified interval arithmetic with correctly rounded kernels}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -67,21 +67,25 @@ ra_div_extended(ra_interval(1, 2), ra_interval(-1, 1))
 Elementary functions are provided at two levels, and the difference between them is a
 difference in what can be proved rather than a difference in speed alone.
 
-The **fast** level evaluates over the system math library and widens the result by a declared
-slack derived from published accuracy measurements. The **rigorous** level evaluates over
-`Rmpfr` with a directed-rounding bridge. When a verdict would otherwise fall inside the slack
-— that is, when the fast level cannot decide the question being asked — the package escalates
-through a ladder of precisions rather than returning a confident answer it cannot defend.
+The **fast** level evaluates with the correctly rounded binary64 implementation included in
+the package: fifteen CORE-MATH kernels and the hardware square root. It widens each finite
+endpoint by the pre-registered slack of two outward steps. The **rigorous** level evaluates
+over `Rmpfr` with a directed-rounding bridge. When a verdict would otherwise fall inside the
+slack — that is, when the fast level cannot decide the question being asked — the package
+escalates through a ladder of precisions rather than returning a confident answer it cannot
+defend.
 
 ```{r}
 ra_elem("exp", ra_interval(0, 1))
 ra_has_mpfr()
 ```
 
-The slack is not a tuning knob chosen for convenience. It is measured against the library
-actually installed, which matters more than it sounds: R does not call the system libm along
-a single fixed path, so a bound published for one library does not certify what R computes.
-`ra_measure_library_error()` is the instrument that measures it.
+The slack is not a tuning knob chosen for convenience. The pre-registered formula is
+`ceiling(2 * e + 1)`, where correct rounding gives the declared bound `e = 0.5`; the same
+formula therefore gives two steps for all sixteen functions. `ra_measure_library_error()`
+checks the included route against an independent multiprecision referent. The fast result
+still carries `measured` provenance because correct rounding of the included software has
+been verified numerically but is not established here as a theorem for every kernel.
 
 ## Expressions, and why the centered form exists
 
@@ -193,3 +197,7 @@ Rump, S. M. (2010). Verification methods: Rigorous results using floating-point 
 
 Rump, S. M., Zimmermann, P., Boldo, S., & Melquiond, G. (2009). Computing predecessor and
 successor in rounding to nearest. *BIT Numerical Mathematics*, 49(2), 419-431.
+
+Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project. In *2022 IEEE
+29th Symposium on Computer Arithmetic (ARITH)* (pp. 26-34). IEEE.
+https://doi.org/10.1109/ARITH54963.2022.00014

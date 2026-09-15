@@ -22,17 +22,17 @@ A list with four elements. \code{differentiable} is a character
   empty.
 }
 \description{
-Runs the admission criteria again, here and now, against the
-  derivative engine and the multiprecision backend of the machine the package
-  is running on, and reports what it found.
+Runs the admission criteria that depend on installed software
+  again, here and now, against the derivative engine and the multiprecision
+  backend of the machine the package is running on, and reports what it found.
 }
 \details{
-The table in the sources is a transcription of measurements taken on
-  one machine on one day. The software underneath it moves: a release of R
-  can add a rule to the derivative table, and a release of the backend can
-  implement a function it did not have. This function exists so that the
-  transcription can be audited rather than trusted, by whoever is running the
-  package and not only by whoever wrote it.
+The derivative engine and multiprecision backend underneath the
+  table can move: a release of R can add a rule to the derivative table, and a
+  release of the backend can implement a function it did not have. The
+  correctly rounded fast kernels travel with the package and are tested
+  separately. This function rechecks the moving criteria so that they are
+  audited rather than trusted by whoever runs the package.
 
   The closure is computed over head symbols rather than over whole
   expressions, which is what makes it terminate. Differentiating a function

@@ -18,9 +18,10 @@ by [ra_operator_table()].}
 \item{x}{An object of class \code{ra_ivl}, or a numeric vector, which is
 promoted to intervals of zero width.}
 
-\item{level}{A character scalar, \code{"fast"} for the system math library
-widened by the declared slack, or \code{"rigorous"} for a multiprecision
-evaluation. Defaults to \code{"fast"}.}
+\item{level}{A character scalar, \code{"fast"} for the included correctly
+rounded binary64 implementation widened by the declared slack, or
+\code{"rigorous"} for a multiprecision evaluation. Defaults to
+\code{"fast"}.}
 
 \item{precision}{An integer scalar, the working precision in bits of the
 rigorous level. Ignored at the fast level. Defaults to the first rung of
@@ -61,6 +62,14 @@ The value returned encloses \code{{f(t) : t in x, t in dom(f)}}. The
 }
 \section{Methodological notes}{
 
+  The fast implementation consists of fifteen CORE-MATH software kernels and
+  the binary64 hardware square root. Its declared error bound is one half of
+  a unit in the last place, so the pre-registered formula
+  \code{ceiling(2 * e + 1)} applies two outward steps to every function. The
+  result retains measured provenance because the correctly rounded claim of
+  the included software was verified numerically and is not established here
+  as a theorem for every kernel.
+
   The reduction that locates the interior extrema is performed in interval
   arithmetic against an enclosure of pi, and the resulting interval of indices
   is asked whether it contains an integer. That interval is a superset of the
@@ -80,9 +89,10 @@ The value returned encloses \code{{f(t) : t in x, t in dom(f)}}. The
 
 \section{Dependencies}{
 
-  Base R at the fast level. The rigorous level requires 'Rmpfr', which is in
-  \code{Suggests}, and raises \code{ra_no_mpfr} when it is absent, since the
-  caller asked for it by name.
+  The fast level uses the package's registered native routines and has no
+  external package dependency. The rigorous level requires 'Rmpfr', which is
+  in \code{Suggests}, and raises \code{ra_no_mpfr} when it is absent, since
+  the caller asked for it by name.
 }
 
 \examples{
@@ -100,10 +110,9 @@ Moore, R. E., Kearfott, R. B., & Cloud, M. J. (2009). Introduction to interval
   interval arithmetic (simplified) (IEEE Std 1788.1-2017).
   https://doi.org/10.1109/IEEESTD.2018.8277144
 
-  Gladman, B., Innocente, V., Mather, J., Ozaki, K., & Zimmermann, P. (2026).
-  Accuracy of mathematical functions in single, double, double extended, and
-  quadruple precision (edition of February 2026) [Technical report].
-  https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+  Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+  In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+  IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
 }
 \seealso{
 [ra_operator_table()] for what is admitted, [ra_slack()] for the
