@@ -99,6 +99,7 @@ jobs:
         if: ${{ always() }}
         with:
           name: verify-${{ matrix.os }}-r${{ matrix.r }}
+          overwrite: true
           path: |
             identity.txt
             cr.txt

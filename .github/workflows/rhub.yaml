@@ -90,8 +90,17 @@ jobs:
         run: |
           v=$(sed -n 's/^Version: *//p' DESCRIPTION)
           echo "IDENTITY sha=$GITHUB_SHA version=$v" > identity.txt
-          lib=$(find check -maxdepth 3 -type d -name 'RobustArithmetic.Rcheck' | head -n 1)
-          if [ -z "$lib" ]; then echo "O_PLATFORM FAIL no checked installation"; exit 1; fi
+          if [ "$RA_LABEL" = "rchk" ]; then
+            # The rchk container runs its own script instead of R CMD check: it installs
+            # the package into the library below (the path its "Check for rchk errors"
+            # step reads) and writes the bcheck report next to the shared object, which
+            # replaces 00check.log in the artifact.
+            lib=/opt/R/devel-rchk/packages/lib
+            if [ ! -d "$lib/RobustArithmetic" ]; then echo "O_PLATFORM FAIL no rchk installation"; exit 1; fi
+          else
+            lib=$(find check -maxdepth 3 -type d -name 'RobustArithmetic.Rcheck' | head -n 1)
+            if [ -z "$lib" ]; then echo "O_PLATFORM FAIL no checked installation"; exit 1; fi
+          fi
           status=0
           if [ "$RA_LABEL" = "nosuggests" ]; then
             # The check above ran without suggested packages. The reference for the
@@ -108,18 +117,27 @@ jobs:
             Rscript dev/platform/O_CR_RMPFR.R "$lib" 60000 20260914 > oracle-cr.txt 2>&1 || status=1
           fi
           Rscript dev/platform/O_PLATFORM.R "$lib" > oracle-platform.txt 2>&1 || status=1
-          cp "$lib/00check.log" 00check.log 2>/dev/null || true
+          if [ "$RA_LABEL" = "rchk" ]; then
+            cp "$lib/RobustArithmetic/libs/RobustArithmetic.so.bcheck" rchk.bcheck 2>/dev/null || true
+          else
+            cp "$lib/00check.log" 00check.log 2>/dev/null || true
+          fi
           cat identity.txt oracle-cr.txt oracle-platform.txt
           exit $status
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
-          name: ${{ matrix.config.label }}-${{ github.job }}-${{ strategy.job-index }}-oracles
+          # The platform name, not the label: labels of the non-container platforms
+          # carry the R version in parentheses. overwrite lets a rerun of a failed job
+          # replace the artifact of the attempt it supersedes.
+          name: ${{ matrix.config.name }}-${{ github.job }}-${{ strategy.job-index }}-oracles
+          overwrite: true
           path: |
             identity.txt
             oracle-cr.txt
             oracle-platform.txt
             00check.log
+            rchk.bcheck
 
   other-platforms:
     needs: setup
@@ -166,7 +184,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
-          name: ${{ matrix.config.label }}-${{ github.job }}-${{ strategy.job-index }}-oracles
+          name: ${{ matrix.config.name }}-${{ github.job }}-${{ strategy.job-index }}-oracles
+          overwrite: true
           path: |
             identity.txt
             oracle-cr.txt
