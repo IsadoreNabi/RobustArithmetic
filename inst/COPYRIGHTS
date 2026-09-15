@@ -1,0 +1,164 @@
+CORE-MATH binary64 sources included in RobustArithmetic
+=======================================================
+
+Upstream project: CORE-MATH
+Upstream repository: https://gitlab.inria.fr/core-math/core-math
+Pinned commit: 1ab68b70b90f807fd2bc9cf20ec295d49ae09592
+Upstream archive SHA-256: 52f35d1029a6c6423f8c537f59164b2359cffe98c1ca2079ea55caf5d1820ce5
+
+The files below are copied under the MIT license reproduced at the end of
+this file. The local changes are limited to namespace isolation and portable,
+warning-free compilation; the mathematical algorithms and constants are
+unchanged.
+
+Repository file: src/coremath_exp.c
+Upstream file: src/binary64/exp/exp.c
+Copyright: 2022-2025 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_exp to ra_cr_exp.
+
+Repository file: src/coremath_log.c
+Upstream file: src/binary64/log/log.c
+Copyright: 2022 INRIA and CERN; authors Paul Zimmermann and Tom Hubrecht
+Local changes: flattened the file name and dint.h inclusion; removed the GCC
+diagnostic-suppression block; replaced the STDC FENV_ACCESS pragma with an
+inert comment; renamed the cr_log symbol family to ra_cr_log.
+
+Repository file: src/coremath_sin.c
+Upstream file: src/binary64/sin/sin.c
+Copyright: 2022-2025 Paul Zimmermann and Tom Hubrecht
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; marked the
+128-bit type declaration as a compiler extension; renamed cr_sin to ra_cr_sin.
+
+Repository file: src/coremath_cos.c
+Upstream file: src/binary64/cos/cos.c
+Copyright: 2022-2025 Paul Zimmermann and Tom Hubrecht
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; marked the
+128-bit type declaration as a compiler extension; renamed cr_cos to ra_cr_cos.
+
+Repository file: src/coremath_tan.c
+Upstream file: src/binary64/tan/tan.c
+Copyright: 2022-2025 Paul Zimmermann and Tom Hubrecht
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; marked the
+128-bit type declaration as a compiler extension; renamed cr_tan to ra_cr_tan.
+
+Repository file: src/coremath_sinh.c
+Upstream file: src/binary64/sinh/sinh.c
+Copyright: 2023-2026 Alexei Sibidanov and Paul Zimmermann
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_sinh to ra_cr_sinh.
+
+Repository file: src/coremath_cosh.c
+Upstream file: src/binary64/cosh/cosh.c
+Copyright: 2023-2025 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_cosh to ra_cr_cosh.
+
+Repository file: src/coremath_tanh.c
+Upstream file: src/binary64/tanh/tanh.c
+Copyright: 2023-2026 Alexei Sibidanov, Cyprien Peignier, and Paul Zimmermann
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_tanh to ra_cr_tanh.
+
+Repository file: src/coremath_expm1.c
+Upstream file: src/binary64/expm1/expm1.c
+Copyright: 2024 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_expm1 to ra_cr_expm1.
+
+Repository file: src/coremath_log1p.c
+Upstream file: src/binary64/log1p/log1p.c
+Copyright: 2024-2025 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_log1p to ra_cr_log1p.
+
+Repository file: src/coremath_log2.c
+Upstream file: src/binary64/log2/log2.c
+Copyright: 2023 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_log2 to ra_cr_log2.
+
+Repository file: src/coremath_log10.c
+Upstream file: src/binary64/log10/log10.c
+Copyright: 2022-2025 INRIA and CERN; authors Paul Zimmermann and Tom Hubrecht
+Local changes: flattened the file name and dint.h inclusion; removed the GCC
+diagnostic-suppression block; replaced the STDC FENV_ACCESS pragma with an
+inert comment; renamed the cr_log10 symbol family to ra_cr_log10.
+
+Repository file: src/coremath_asin.c
+Upstream file: src/binary64/asin/asin.c
+Copyright: 2022-2026 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_asin to ra_cr_asin.
+
+Repository file: src/coremath_acos.c
+Upstream file: src/binary64/acos/acos.c
+Copyright: 2024-2025 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_acos to ra_cr_acos.
+
+Repository file: src/coremath_atan.c
+Upstream file: src/binary64/atan/atan.c
+Copyright: 2023 Alexei Sibidanov
+Local changes: flattened the file name; removed the GCC diagnostic-suppression
+block; replaced the STDC FENV_ACCESS pragma with an inert comment; renamed
+cr_atan to ra_cr_atan.
+
+Repository file: src/coremath_log_dint.h
+Upstream file: src/binary64/log/dint.h
+Copyright: 2022 CERN; author Tom Hubrecht
+Local changes: flattened the file name; namespaced its include guards; marked
+the 128-bit type declaration as a compiler extension.
+
+Repository file: src/coremath_log1p_dint.h
+Upstream file: src/binary64/log1p/dint.h
+Copyright: 2022 CERN; author Tom Hubrecht
+Local changes: flattened the file name; namespaced its include guards; marked
+the 128-bit type declaration as a compiler extension.
+
+Repository file: src/coremath_log10_dint.h
+Upstream file: src/binary64/log10/dint.h
+Copyright: 2022 CERN; author Tom Hubrecht
+Local changes: flattened the file name; namespaced its include guards; marked
+the 128-bit type declaration as a compiler extension.
+
+Repository file: dev/core-math/LICENSE
+Upstream file: LICENSE supplied with the pinned archive
+Copyright: CORE-MATH authors and copyright holders identified above
+Local changes: none.
+
+MIT license
+-----------
+
+The CORE-MATH code is distributed under the following license
+(MIT license, https://spdx.org/licenses/MIT).
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

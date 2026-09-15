@@ -43,6 +43,18 @@ The package is organised in levels.
   subdivision engine. Their only failure mode is a named abstention that
   prints the budget it exhausted.
 }
+\section{Included correctly rounded kernels}{
+
+  The package carries the binary64 implementations of \code{exp}, \code{log},
+  \code{sin}, \code{cos}, \code{tan}, \code{sinh}, \code{cosh}, \code{tanh},
+  \code{expm1}, \code{log1p}, \code{log2}, \code{log10}, \code{asin},
+  \code{acos}, and \code{atan} from CORE-MATH commit
+  \code{1ab68b70b90f807fd2bc9cf20ec295d49ae09592}. Square root uses the
+  binary64 hardware operation. The kernels are available to an internal
+  validation interface in this version; the fast interval level retains its
+  existing system-library path.
+}
+
 \section{What the interval standard asks, and what this package answers}{
 
   Conformance with IEEE Std 1788.1-2017 is \strong{not} claimed, and the
@@ -155,6 +167,14 @@ Institute of Electrical and Electronics Engineers. (2015). IEEE standard for
 
   Tucker, W. (2011). Validated numerics: A short introduction to rigorous
   computations. Princeton University Press.
+
+  Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+  In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+  IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
+
+  CORE-MATH Project. (2026). CORE-MATH (Commit
+  1ab68b70b90f807fd2bc9cf20ec295d49ae09592) [Software]. INRIA.
+  https://gitlab.inria.fr/core-math/core-math
 }
 \seealso{
 [ra_succ()] for the outward-rounding layer, [ra_operator_table()]
@@ -167,6 +187,16 @@ Institute of Electrical and Electronics Engineers. (2015). IEEE standard for
 Authors:
 \itemize{
   \item Jose Mauricio Gomez Julian \email{isadore.nabi@pm.me} (\href{https://orcid.org/0009-0000-2412-3150}{ORCID})
+}
+
+Other contributors:
+\itemize{
+  \item Alexei Sibidanov [contributor, copyright holder]
+  \item Paul Zimmermann [contributor, copyright holder]
+  \item Tom Hubrecht [contributor, copyright holder]
+  \item Cyprien Peignier [contributor, copyright holder]
+  \item CERN [copyright holder]
+  \item INRIA [copyright holder]
 }
 
 }

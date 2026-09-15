@@ -33,6 +33,15 @@
 #'   extended division and epsilon-inflated candidate verification, and a
 #'   subdivision engine. Their only failure mode is a named abstention that
 #'   prints the budget it exhausted.
+#' @section Included correctly rounded kernels:
+#'   The package carries the binary64 implementations of \code{exp}, \code{log},
+#'   \code{sin}, \code{cos}, \code{tan}, \code{sinh}, \code{cosh}, \code{tanh},
+#'   \code{expm1}, \code{log1p}, \code{log2}, \code{log10}, \code{asin},
+#'   \code{acos}, and \code{atan} from CORE-MATH commit
+#'   \code{1ab68b70b90f807fd2bc9cf20ec295d49ae09592}. Square root uses the
+#'   binary64 hardware operation. The kernels are available to an internal
+#'   validation interface in this version; the fast interval level retains its
+#'   existing system-library path.
 #' @section What the interval standard asks, and what this package answers:
 #'   Conformance with IEEE Std 1788.1-2017 is \strong{not} claimed, and the
 #'   reason is the standard's own. Its subclause 1.5 defines conformance as a
@@ -137,8 +146,17 @@
 #'
 #'   Tucker, W. (2011). Validated numerics: A short introduction to rigorous
 #'   computations. Princeton University Press.
+#'
+#'   Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project.
+#'   In 2022 IEEE 29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34).
+#'   IEEE. https://doi.org/10.1109/ARITH54963.2022.00014
+#'
+#'   CORE-MATH Project. (2026). CORE-MATH (Commit
+#'   1ab68b70b90f807fd2bc9cf20ec295d49ae09592) [Software]. INRIA.
+#'   https://gitlab.inria.fr/core-math/core-math
 #' @seealso [ra_succ()] for the outward-rounding layer, [ra_operator_table()]
 #'   for what an expression may contain, and [ra_has_mpfr()] for the rigorous
 #'   level.
+#' @useDynLib RobustArithmetic, .registration = TRUE, .fixes = "C_"
 #' @keywords internal
 "_PACKAGE"

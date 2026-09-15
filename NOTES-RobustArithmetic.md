@@ -1459,3 +1459,89 @@ defecto que motivó esta unidad. La suite completa con todos los portones termin
 `SUITE_ALLGATES FAILED 0 ERRORS 0 SKIPPED 2`, con la misma cantidad de saltos que la medición de
 partida. No se modificaron la compuerta, las salvaguardas, los centinelas, las holguras, el ancla, el
 código del paquete ni su documentación de referencia.
+
+---
+
+## §13. La copia sellada de CORE-MATH incorpora el referente correctamente redondeado
+
+El paquete incorpora las implementaciones binarias de doble precisión de CORE-MATH para
+`exp`, `log`, `sin`, `cos`, `tan`, `sinh`, `cosh`, `tanh`, `expm1`, `log1p`, `log2`,
+`log10`, `asin`, `acos` y `atan`, tomadas del commit sellado
+`1ab68b70b90f807fd2bc9cf20ec295d49ae09592`. La raíz cuadrada se evalúa con la operación de
+hardware. Esta unidad sólo incorpora y verifica ese núcleo: el nivel rápido continúa usando la
+biblioteca matemática del sistema, y no cambiaron sus holguras, sus centinelas, el ancla ni las
+reglas de degradación.
+
+La causa de la incorporación es la ruta heterogénea que quedó medida en Windows. Ocho de las
+dieciséis funciones usadas por el paquete no llegan a la biblioteca matemática de la biblioteca
+universal de C, sino que R las lleva compiladas desde `libmingwex`; esa ruta usa instrucciones x87,
+no tiene cifras públicas de exactitud binaria de doble precisión y produjo errores de seno y
+coseno mayores que la holgura declarada. Llevar un núcleo correctamente redondeado dentro del
+paquete elimina esa dependencia de plataforma en la capa que la unidad siguiente conectará.
+
+### §13.1. La copia y sus modificaciones locales
+
+`dev/core-math/UPSTREAM` fija el repositorio, el commit, la fecha del archivo y las sumas SHA-256
+del archivo comprimido y de su licencia. `dev/core-math/FILES` relaciona cada una de las dieciocho
+fuentes y cabeceras copiadas, más la copia de la licencia, con su ruta dentro del archivo sellado.
+`dev/core-math/import.sh` rehúsa una fuente cuya suma no coincida y reconstruye esos diecinueve
+archivos en un directorio nuevo. `inst/COPYRIGHTS` registra para cada archivo su origen, titular y
+modificaciones, y reproduce íntegramente la licencia MIT.
+
+Las modificaciones locales pertenecen a las cuatro clases autorizadas. En los quince fuentes se
+quitó el bloque que silenciaba pragmas desconocidas y se sustituyó `STDC FENV_ACCESS` por un
+comentario inerte. Las declaraciones `_BitInt(128)` de seno, coseno, tangente y las tres cabeceras
+`dint.h` se marcaron con `__extension__`, de modo que C17 no las diagnostique y C23 conserve el
+mismo tipo. Los archivos y las inclusiones se aplanaron con nombres `coremath_*`, las guardas de
+las tres cabeceras se aislaron por función y los símbolos públicos `cr_*` pasaron al espacio
+`ra_cr_*`. No se modificaron algoritmos, constantes ni ramas matemáticas, y
+`CORE_MATH_SUPPORT_ERRNO` permanece sin definir.
+
+El código propio registra una única rutina de llamada, impide la búsqueda dinámica de símbolos y
+expone dentro del espacio de nombres de R el evaluador `.ra_cr(fun, x)`. El evaluador acepta dobles
+e enteros, descarta atributos, conserva por separado valores ausentes y valores indeterminados, y
+rehúsa nombres de función o entradas ajenos al contrato. Ningún símbolo definido por la biblioteca
+compartida queda fuera de `R_init_RobustArithmetic` y del prefijo `ra_`.
+
+### §13.2. Los casos embebidos provienen del referente independiente
+
+`tests/testthat/core-math-cases.csv` contiene 128 entradas por función y 2.048 en total, como
+patrones hexadecimales exactos de IEEE 754. Para cada función de CORE-MATH se tomaron cien
+posiciones equiespaciadas del conjunto de casos difíciles y veintiocho posiciones equiespaciadas
+de la muestra construida con semilla 20260914. Para `sqrt`, que no tiene conjunto de casos
+difíciles en CORE-MATH, se tomaron 128 posiciones equiespaciadas de esa muestra. Tanto las entradas
+como las salidas se leyeron de las referencias calculadas con MPFR 4.2.2; ninguna salida esperada
+se obtuvo del código bajo prueba. La comparación conserva el signo de cero y es exacta en bits,
+con la única excepción declarada de que no atribuye significado al contenido interno de un valor
+indeterminado.
+
+### §13.3. Lo medido sobre la integración
+
+La reconstrucción desde el archivo sellado terminó con diecinueve archivos reproducidos y cero
+discrepancias. Las diecisiete unidades de compilación terminaron con cero avisos y cero fallos bajo
+GCC en C17 y C23, y bajo Clang 21 para Linux x86_64 y macOS arm64. Las tres construcciones del
+oráculo de redondeo, la configuración de fábrica, `-march=x86-64-v3` y `-O0`, compararon en cada
+caso 73.131.510 entradas distribuidas entre los 32 conjuntos de referencia y terminaron con cero
+conjuntos discrepantes; las tres conservaron además la tabla de símbolos limpia. La construcción
+de R 4.6.1 sin doble largo repitió las 73.131.510 comparaciones y también terminó con cero conjuntos
+discrepantes. El contrato del evaluador pasó sus 104 comprobaciones, y el control de procedencia de
+los casos confirmó las 128 filas de cada función y al menos cien casos difíciles por función, o
+las 128 entradas de muestra exigidas para la raíz cuadrada.
+
+La suite completa con todos los portones terminó en
+`SUITE_ALLGATES FAILED 0 ERRORS 0 SKIPPED 2`; la variante de R sin doble largo y sin Rmpfr terminó
+en `SUITE_NOLD FAILED 0 ERRORS 0`. El arnés permanente de ocho escenarios conservó
+`SCENARIOS PASS`.
+
+Dos de los tres chequeos naturales terminaron en `Status: OK`: R sin doble largo con Rmpfr y R sin
+doble largo sin paquetes sugeridos. El chequeo con el R del sistema terminó en `Status: 1 NOTE`.
+Su único diagnóstico enumeró `-Werror=format-security`, las definiciones de fortalecimiento de
+Fedora, `-march=x86-64`, `-mno-omit-leaf-frame-pointer` y `-mtls-dialect=gnu2`; son componentes
+literales de `R CMD config CFLAGS` en esta instalación y no banderas agregadas por el paquete. Una
+copia temporal con `CFLAGS` vacío en `Makevars` confirmó que intentar neutralizarlas desde el
+paquete agrega una advertencia por sustituir la configuración del usuario y no elimina la nota.
+La repetición diagnóstica que declaró como conocidas las banderas devueltas por
+`R CMD config CFLAGS`, sólo para el chequeo del R del sistema, terminó en `Status: OK`. Por eso la
+integración queda implementada y sus pruebas funcionales quedan en verde, pero el oráculo de los
+tres chequeos no satisface su resultado esperado hasta que su comando reconozca las banderas
+propias del R anfitrión sin ocultar ninguna bandera que agregue el paquete.

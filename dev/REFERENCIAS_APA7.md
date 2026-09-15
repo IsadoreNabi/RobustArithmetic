@@ -44,6 +44,12 @@ gris** (las normas IEEE y el reporte de exactitud caen acá), **§10.10 software
       successor in rounding to nearest. BIT Numerical Mathematics, 49(2), 419-431.
       https://doi.org/10.1007/s10543-009-0218-z
 
+## Actas de congreso (§10.5)
+
+    Sibidanov, A., Zimmermann, P., & Glondu, S. (2022). The CORE-MATH project. In 2022 IEEE
+      29th Symposium on Computer Arithmetic (ARITH) (pp. 26-34). IEEE.
+      https://doi.org/10.1109/ARITH54963.2022.00014
+
 ## Libros (§10.2)
 
     Hansen, E., & Walster, G. W. (2004). Global optimization using interval analysis (2nd
@@ -98,6 +104,10 @@ cursiva y lleva el número de versión y el corchete descriptivo.
       1.1-2) [Software]. Comprehensive R Archive Network.
       https://doi.org/10.32614/CRAN.package.Rmpfr
 
+    CORE-MATH Project. (2026). CORE-MATH (Commit
+      1ab68b70b90f807fd2bc9cf20ec295d49ae09592) [Software]. INRIA.
+      https://gitlab.inria.fr/core-math/core-math
+
 ---
 
 ## Dónde va cada una (mapa de aplicación)
@@ -112,7 +122,8 @@ cursiva y lleva el número de versión y el corchete descriptivo.
 | `R/conditions.R` | Wickham (2019); Maechler (2024); Fousse et al. (2007) |
 | `R/elementary.R` | Moore et al. (2009); IEEE (2018); Gladman et al. (2026); Neumaier (1990); Muller et al. (2018); Revol & Rouillier (2005); Rump (2010); Wickham (2019) |
 | `R/expression.R` | Moore et al. (2009); Neumaier (1990) |
-| `R/RobustArithmetic-package.R` | IEEE (2015); Rump et al. (2009); Rump (2010); Neumaier (1990); Hansen & Walster (2004); Moore et al. (2009); Tucker (2011) |
+| `R/RobustArithmetic-package.R` | IEEE (2015); Rump et al. (2009); Rump (2010); Neumaier (1990); Hansen & Walster (2004); Moore et al. (2009); Tucker (2011); Sibidanov et al. (2022); CORE-MATH Project (2026) |
+| `R/core-math.R` | Sibidanov et al. (2022) |
 
 *(Fila del archivo de paquete agregada en la sesion 81: no estaba en el mapa de la 80 y su
 bloque `@references` — el panorama del paquete — tambien entra al barrido.)*
